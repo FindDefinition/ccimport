@@ -1,4 +1,7 @@
 # ccimport
+
+[![Build Status](https://github.com/FindDefinition/ccimport/workflows/build/badge.svg)](https://github.com/FindDefinition/ccimport/actions?query=workflow%3Abuild)
+
 a tiny package for fast python c++ binding build.
 
 ## Usage
