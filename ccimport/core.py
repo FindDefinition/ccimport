@@ -298,7 +298,7 @@ def autoimport(sources: List[Union[str, Path]],
     final_source_lines.extend(py_module_code_lines)
     with tempdir() as dirpath:
         path_to_write = Path(dirpath) / "main.cc"
-        path_to_write = path_to_write.reslove()
+        path_to_write = path_to_write.resolve()
         with path_to_write.open("w") as f:
             f.write("\n".join(final_source_lines))
 
