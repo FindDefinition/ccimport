@@ -26,6 +26,8 @@ REQUIRED = [
     "ninja",
     "requests",
 ]
+if sys.version_info[:2] == (3, 6):
+    REQUIRED.append("dataclasses")
 if sys.version_info < (3, 8):
     REQUIRED.append("importlib_metadata>=1.6")
 
