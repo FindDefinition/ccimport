@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from ccimport import compat
+from ccimport.compat import VALID_PYTHON_MODULE_NAME_PATTERN
 
 if compat.Python3_8AndLater:
     from importlib.metadata import PackageNotFoundError, distribution, version
@@ -18,6 +19,8 @@ def locate_package(package_name, cwd_check=False) -> Optional[Path]:
     """locale package by find_spec, perfered method.
     """
     assert package_name != "__init__"
+    if not VALID_PYTHON_MODULE_NAME_PATTERN.match(package_name):
+        return None
     spec = importlib.util.find_spec(package_name)
     if spec is None:
         return None
@@ -35,6 +38,7 @@ def locate_package(package_name, cwd_check=False) -> Optional[Path]:
             raise ValueError(msg)
         return origin.parent
     return origin
+
 
 def locate_top_package(file_path, check_dist=False, cwd_check=False):
     """you need to provide a setup.py in your project and
@@ -67,6 +71,7 @@ def locate_top_package(file_path, check_dist=False, cwd_check=False):
                     raise ValueError(msg)
                 break
     return res
+
 
 def _get_mod_name_from_path(path):
     path = Path(path)
@@ -118,4 +123,3 @@ def try_import_from_path(path, mod_name=None):
     sys.modules[mod_name] = module
     spec.loader.exec_module(module)
     return module
-
