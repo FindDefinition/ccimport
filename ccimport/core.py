@@ -134,6 +134,11 @@ def ccimport(source_paths: List[Union[str, Path]],
     build_out_path = build_dir / target_filename
     out_path = out_path.parent / target_filename
     shutil.copy(build_out_path, out_path)
+    if compat.InWindows and build_ctype:
+        win_lib_file = build_out_path.parent / (build_out_path.stem + ".lib")
+        if win_lib_file.exists():
+            shutil.copy(win_lib_file, out_path.parent / win_lib_file.name)
+
     extension_path = str(out_path)
     if not disable_hash:
         with fake_out_as_hash.open("w") as f:
