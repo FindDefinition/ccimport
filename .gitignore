@@ -125,3 +125,5 @@ docs_out
 
 *.exp
 *.lib
+
+__version__.py

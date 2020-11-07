@@ -25,11 +25,9 @@ REQUIRED = [
     "pybind11",
     "ninja",
     "requests",
+    "importlib-metadata>=2.0; python_version < \"3.8\"",
+    "dataclasses; python_version == \"3.6\"",
 ]
-if sys.version_info[:2] == (3, 6):
-    REQUIRED.append("dataclasses")
-if sys.version_info < (3, 8):
-    REQUIRED.append("importlib_metadata>=1.6")
 
 # What packages are optional?
 EXTRAS = {
