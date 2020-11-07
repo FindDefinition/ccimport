@@ -11,20 +11,21 @@ from ccimport import compat
 ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++'])
 ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
 
-_ALL_OVERRIDE_FLAGS = (
-    set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]),
-)
+_ALL_OVERRIDE_FLAGS = (set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]), )
+
 
 def _list_none(val):
     if val is None:
         return []
     return val
 
+
 _ALL_COMPILER_PLATFORM = {
     "Linux": set(["g++", 'clang++', 'nvcc', 'hipcc']),
     "Darwin": set(["clang++"]),
     "Windows": set(["cl", 'clang++', 'nvcc', 'hipcc']),
 }
+
 
 def _filter_unsupported_compiler(compilers: List[str]):
     all_supported = _ALL_COMPILER_PLATFORM[platform.system()]
@@ -33,6 +34,7 @@ def _filter_unsupported_compiler(compilers: List[str]):
         if c.strip() in all_supported:
             supported.append(c)
     return supported
+
 
 class BuildOptions:
     def __init__(self,
@@ -63,9 +65,10 @@ class BuildOptions:
 
     def merge(self, opt: "BuildOptions"):
         res = self.copy()
-        res.includes.extend(opt.includes)        
+        res.includes.extend(opt.includes)
         res.cflags.extend(self._override_flags(res.cflags, opt.cflags))
-        res.post_cflags.extend(self._override_flags(res.post_cflags, opt.post_cflags))
+        res.post_cflags.extend(
+            self._override_flags(res.post_cflags, opt.post_cflags))
         return res
 
 
@@ -295,13 +298,14 @@ class BaseWritter(Writer):
         for p in source_paths:
             suffix = p.suffix
             compiler_var = self._suffix_to_cl[suffix]
-            if compiler_var in compiler_to_rule:
-                rule_name = compiler_to_rule[compiler_var]
+            compiler = self._compiler_var_to_name[compiler_var]
+            if compiler in compiler_to_rule:
+                rule_name = compiler_to_rule[compiler]
             else:
                 compiler = self._compiler_var_to_name[compiler_var]
                 rule_name = self.create_build_rule(
                     compiler_var, target_name, compiler_to_option[compiler])
-                compiler_to_rule[compiler_var] = rule_name
+                compiler_to_rule[compiler] = rule_name
             path_to_rule[p] = rule_name
         # for k, v in compiler_to_option.items():
         link_opts = link_opts.copy()

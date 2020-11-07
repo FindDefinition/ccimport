@@ -1,10 +1,10 @@
 import os
 import platform
+import re
 import subprocess
 import sys
 import sysconfig
-import re 
-from enum import Enum 
+from enum import Enum
 
 Python3 = (sys.version_info[0] == 3)
 Python4 = (sys.version_info[0] == 4)
@@ -22,11 +22,13 @@ assert Python3_5AndLater, "only support python >= 3.5"
 
 VALID_PYTHON_MODULE_NAME_PATTERN = re.compile(r"[a-zA-Z_][0-9a-zA-Z_]*")
 
+
 class OSType(Enum):
     Win10 = "Win10"
     MacOS = "MacOS"
     Linux = "Linux"
     Unknown = "Unknown"
+
 
 OS = OSType.Unknown
 
@@ -35,14 +37,14 @@ if os.name == 'nt':
     InWindows = True
     OS = OSType.Win10
 
-InLinux = False 
+InLinux = False
 if platform.system() == "Linux":
-    InLinux = True 
+    InLinux = True
     OS = OSType.Linux
 
-InMacOS = False  
+InMacOS = False
 if platform.system() == "Darwin":
-    InMacOS = True 
+    InMacOS = True
     OS = OSType.MacOS
 
 
@@ -114,6 +116,7 @@ def get_system_include_paths(compiler, cpp=True):
         line = line.strip()
         paths.append(line)
     return paths
+
 
 def locate_libpython_2(python_version: str):
     """Get path to the python library associated with the current python

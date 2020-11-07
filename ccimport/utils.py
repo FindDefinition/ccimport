@@ -1,12 +1,8 @@
 import contextlib
-import os
 import shutil
-import subprocess
 import tempfile
-import time
 from pathlib import Path
 
-from ccimport import compat
 
 @contextlib.contextmanager
 def tempdir(delete=True):

@@ -19,11 +19,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import pybind11
-from ccimport import compat
-from ccimport import loader
+
+from ccimport import compat, loader
+from ccimport.buildtools.writer import build_simple_ninja, fill_build_flags
 from ccimport.source_iter import CppSourceIterator
-from ccimport.buildtools.writer import (build_simple_ninja,
-                                             fill_build_flags)
 from ccimport.utils import tempdir
 
 _PYBIND_COMMON_INCLUDES = [
@@ -32,6 +31,20 @@ _PYBIND_COMMON_INCLUDES = [
     "#include <pybind11/numpy.h>",
     # "#include <pybind11/eigen.h>",
 ]
+
+
+def get_full_file_name(name, build_ctype):
+    lib_prefix = ""
+    if not compat.InWindows and build_ctype:
+        lib_prefix = "lib"
+    if not build_ctype:
+        lib_suffix = compat.get_extension_suffix()
+    else:
+        if compat.InWindows:
+            lib_suffix = ".dll"
+        else:
+            lib_suffix = ".so"
+    return lib_prefix + name + lib_suffix
 
 
 def ccimport(source_paths: List[Union[str, Path]],
@@ -113,18 +126,8 @@ def ccimport(source_paths: List[Union[str, Path]],
     python_includes = compat.get_pybind11_includes()
     includes.extend(python_includes)
 
-    target_filename = None
-    lib_prefix = ""
-    if not compat.InWindows and build_ctype:
-        lib_prefix = "lib"
-    if not build_ctype:
-        lib_suffix = compat.get_extension_suffix()
-        target_filename = lib_prefix + lib_name + lib_suffix
-    else:
-        if compat.InWindows:
-            lib_suffix = ".dll"
-        else:
-            lib_suffix = ".so"
+    target_filename = get_full_file_name(lib_name, build_ctype)
+
     build_dir = out_path.parent / "build"
     build_dir.mkdir(exist_ok=True)
     target_filename = build_simple_ninja(lib_name, build_dir, source_paths,
@@ -264,6 +267,8 @@ def autoimport(sources: List[Union[str, Path]],
                compile_options: Optional[List[str]] = None,
                link_options: Optional[List[str]] = None,
                std="c++14",
+               disable_hash=False,
+               load_library=True,
                additional_cflags: Optional[Dict[str, List[str]]] = None):
     sources = list(map(lambda p: Path(p).resolve(), sources))
     if includes is None:
@@ -316,6 +321,7 @@ def autoimport(sources: List[Union[str, Path]],
                        link_options,
                        std=std,
                        source_paths_for_hash=sources,
-                       disable_hash=False,
+                       disable_hash=disable_hash,
+                       load_library=load_library,
                        additional_cflags=additional_cflags)
         return mod

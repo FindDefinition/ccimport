@@ -5,9 +5,8 @@ import bisect
 import re
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
-import re
 from enum import Enum
+from typing import Dict, List, Tuple
 
 CPP_SIMPLE_TOKEN = r"""
 # group 1 is comments, dont care group2
@@ -93,6 +92,7 @@ class CppSourceIterator(object):
     # TODO try to handle '<' and '>'
     # TODO use regex to write a c++ tokenize library
     AllSymbols = set([";", ":", "<", ">", "{", "}", "[", "]", "(", ")", "|"])
+
     def __init__(self, source):
         # if len(source) == 0:
         #     raise ValueError("dont support empty source")
@@ -318,8 +318,7 @@ class CppSourceIterator(object):
         self.bracket_state = state[1]
 
     def find_identifier_prefix(self, prefix: str, full_match=False):
-        for i in find_list_str_prefix(self.identifiers, prefix,
-                                               full_match):
+        for i in find_list_str_prefix(self.identifiers, prefix, full_match):
             meta = self.identifier_metas[i]
             yield meta
 

@@ -1,1 +1,1 @@
-from .core import ccimport, autoimport
+from .core import autoimport, ccimport
