@@ -506,7 +506,6 @@ def create_simple_ninja(target,
                       target_filename, shared)
     return writer.content, target_filename
 
-
 def build_simple_ninja(target,
                        build_dir,
                        sources,
@@ -532,8 +531,22 @@ def build_simple_ninja(target,
     cmds = ["ninja"]
     if verbose:
         cmds.append("-v")
-    subprocess.check_call(cmds, cwd=str(build_dir))
-    return target_filename
+    proc = subprocess.Popen(cmds, cwd=str(build_dir),
+                            stdout=subprocess.PIPE,
+                            text=True)
+    output = ''
+    while True:
+        chunk_or_line = proc.stdout.readline()
+        if not chunk_or_line:
+            break
+        output += chunk_or_line
+        # print(chunk_or_line.encode("utf-8"))
+        if not "ninja: no work to do" in chunk_or_line:
+            print(chunk_or_line, end='')
+    no_work_to_do = False
+    if "ninja: no work to do" in output:
+        no_work_to_do = True
+    return target_filename, no_work_to_do
 
 
 def run_simple_ninja(target,

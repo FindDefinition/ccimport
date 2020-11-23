@@ -4,7 +4,7 @@ libclang is too huge for simple c++ analysis.
 import bisect
 import re
 from bisect import bisect_left, bisect_right
-from dataclasses import dataclass
+# from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Tuple
 
@@ -59,33 +59,34 @@ def find_list_str_prefix(data: List[str], prefix: str, full_match=False):
         yield i
 
 
-@dataclass
 class IdentifierMeta:
-    name: str
-    start: int
-    end: int
+    def __init__(self, name: str, start: int, end: int):
+        self.name = name 
+        self.start = start 
+        self.end = end 
 
-
-@dataclass
 class ClassDef:
-    name: str
-    keyword_pos: int
-    body_start: int
-    body_end: int
-    local_id: str = ""
-    is_template: bool = False
+    def __init__(self, name: str, keyword_pos: int, body_start: int,
+        body_end: int, local_id: str = "", is_template: bool = False):
+        self.name = name 
+        self.keyword_pos = keyword_pos 
+        self.body_start = body_start 
+        self.body_end = body_end 
+        self.local_id = local_id 
+        self.is_template = is_template 
 
-
-@dataclass
 class FunctionDef:
-    name: str
-    identifier_pos: int
-    param_start: int
-    param_end: int
-    body_start: int
-    body_end: int
-    is_template: bool
-    local_id: str = ""
+    def __init__(self, name: str, identifier_pos: int, param_start: int,
+        param_end: int, body_start: int,
+        body_end: int, local_id: str = "", is_template: bool = False):
+        self.name = name 
+        self.identifier_pos = identifier_pos 
+        self.param_start = param_start 
+        self.param_end = param_end 
+        self.body_start = body_start 
+        self.body_end = body_end 
+        self.local_id = local_id 
+        self.is_template = is_template 
 
 
 class CppSourceIterator(object):
@@ -374,15 +375,32 @@ class CppSourceIterator(object):
                     if next_semi is not None:
                         func_meta = FunctionDef(meta.name, meta.start,
                                                 round_pair[0], round_pair[1],
-                                                -1, -1, is_template, func_id)
+                                                -1, -1, func_id, is_template)
                         res.append(func_meta)
 
                 continue
 
             func_meta = FunctionDef(meta.name, meta.start, round_pair[0],
                                     round_pair[1], curly_pair[0],
-                                    curly_pair[1], is_template, func_id)
+                                    curly_pair[1], func_id, is_template)
             res.append(func_meta)
+        self.restore_state(state)
+        return res
+
+    def find_marked_identifier(self, mark: str):
+        state = self.state()
+        res = []  # type: List[Tuple[str,str]]
+        for meta in self.find_identifier_prefix(mark, full_match=True):
+            self.reset_bracket_count().move(meta.end)
+            meta = self.next_identifier()
+            if meta is None:
+                continue
+            namespaces = []
+            for ns, ns_start, ns_end in self._namespace_ranges:
+                if meta.start > ns_start and meta.start < ns_end:
+                    namespaces.append(ns)
+
+            res.append((meta.name, "::".join(namespaces)))
         self.restore_state(state)
         return res
 
@@ -436,6 +454,7 @@ class CppSourceIterator(object):
                 continue
             if self.pos in self.identifier_start_to_meta:
                 meta = self.identifier_start_to_meta[self.pos]
+                self.pos = meta.end
                 return meta
             else:
                 return None
@@ -472,3 +491,26 @@ class CppSourceIterator(object):
                 yield meta
             else:
                 break
+
+
+if __name__ == "__main__":
+    source = """
+    std::cout << L"hello" << " world";
+    std::cout << "He said: \"bananas\"" << "...";
+    std::cout << ("");
+    std::cout << "\x12\23\x34";
+    "" // empty string
+    '"' // character literal
+
+    // this is "a string literal" in a comment
+    /* this is
+    "also inside"
+    //a comment */
+
+    // and this /*
+    "is not in a comment"
+    // */
+
+    """
+    it = CppSourceIterator(source)
+    print(it.bracket_pairs)

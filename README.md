@@ -40,8 +40,8 @@ def autoimport(sources: List[Union[str, Path]], # list of source path, may inclu
                libpaths: Optional[List[Union[str, Path]]] = None, # library paths
                libraries: Optional[List[str]] = None, # libraries. the name of library must be a name 
                                            # without platform library prefix and suffix such as `lib-`, '.so'.
-               export_keyword="CODEAI_EXPORT", # use the macro to mark a exported function.
-               export_init_keyword="CODEAI_EXPORT_INIT", # use the macro to mark a static class factory member.
+               export_kw="CODEAI_EXPORT", # use the macro to mark a exported function.
+               export_init_kw="CODEAI_EXPORT_INIT", # use the macro to mark a static class factory member.
                compile_options: Optional[List[str]] = None, # compile options.
                link_options: Optional[List[str]] = None, # link options.
                std="c++14", # c++ standard.
