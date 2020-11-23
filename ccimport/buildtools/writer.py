@@ -133,7 +133,7 @@ class BaseWritter(Writer):
 
     def gcc_build_setup(self, name, compiler, compiler_var,
                         opts: BuildOptions):
-        global_build_opts: BuildOptions = self.compiler_build_opts.get(
+        global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
         includes = " ".join(["-I" + str(i) for i in opts.includes])
@@ -152,7 +152,7 @@ class BaseWritter(Writer):
         return rule_name
 
     def gcc_link_setup(self, name, linker, linker_name, opts: LinkOptions):
-        global_build_opts: LinkOptions = self.compiler_link_opts.get(
+        global_build_opts = self.compiler_link_opts.get(
             linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
@@ -168,7 +168,7 @@ class BaseWritter(Writer):
 
     def msvc_build_setup(self, name, compiler, compiler_var,
                          opts: BuildOptions):
-        global_build_opts: BuildOptions = self.compiler_build_opts.get(
+        global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
         includes = " ".join(
@@ -186,7 +186,7 @@ class BaseWritter(Writer):
         return rule_name
 
     def msvc_link_setup(self, name, linker, linker_name, opts: LinkOptions):
-        global_build_opts: LinkOptions = self.compiler_link_opts.get(
+        global_build_opts = self.compiler_link_opts.get(
             linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
@@ -203,7 +203,7 @@ class BaseWritter(Writer):
 
     def nvcc_build_setup(self, name, compiler, compiler_var,
                          opts: BuildOptions):
-        global_build_opts: BuildOptions = self.compiler_build_opts.get(
+        global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
         includes = " ".join(["-I" + str(i) for i in opts.includes])
@@ -220,7 +220,7 @@ class BaseWritter(Writer):
         return rule_name
 
     def nvcc_link_setup(self, name, linker, linker_name, opts: LinkOptions):
-        global_build_opts: LinkOptions = self.compiler_link_opts.get(
+        global_build_opts = self.compiler_link_opts.get(
             linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
@@ -449,7 +449,7 @@ def group_dict_by_split(data: Dict[str, List[Any]], split: str = ","):
     """convert {gcc,clang++: [xxx], clang++: [yyy]}
     to {gcc: [xxx], clang++: [xxx, yyy]}
     """
-    new_data: Dict[str, List[Any]] = {}
+    new_data = {} # type: Dict[str, List[Any]]
     for k, v in data.items():
         ks = k.split(split)
         for k_ in ks:
