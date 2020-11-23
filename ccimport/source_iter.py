@@ -152,7 +152,7 @@ class CppSourceIterator(object):
     def find_symbols_in_range(self, sym, start, end=None):
         if sym not in self._symbol_to_poses:
             raise KeyError(
-                f"unknown sym {sym}. available: {list(self._symbol_to_poses.keys())}"
+                "unknown sym {}. available: {}".format(sym, list(self._symbol_to_poses.keys()))
             )
         poses = self._symbol_to_poses[sym]
         hi = len(poses)
@@ -262,14 +262,14 @@ class CppSourceIterator(object):
                 end_bracket = end_brackets[val]
                 if not bracket_stack[end_bracket]:
                     raise ValueError(
-                        f"unbalanced bracket '{val}'({self.pos}) in your source."
+                        "unbalanced bracket '{}'({}) in your source.".format(val, self.pos)
                     )
                 start_val, start = bracket_stack[end_bracket].pop()
                 pairs.append((start_val, start, self.pos))
             self.pos += 1
             self.skip_string_comment()
         for k, v in bracket_stack.items():
-            assert len(v) == 0, f"unbalanced bracket {k} in your source."
+            assert len(v) == 0, "unbalanced bracket {} in your source.".format(k)
         return pairs, symbol_to_poses
 
     def get_namespace_ranges(self, class_defs: List[ClassDef]):

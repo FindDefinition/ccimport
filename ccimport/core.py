@@ -115,7 +115,7 @@ def ccimport(source_paths: List[Union[str, Path]],
     if compat.InWindows:
         # in windows, we need to link against python library.
         if not build_ctype:
-            py_version_str_p = f"{py_version[0]}.{py_version[1]}"
+            py_version_str_p = "{}.{}".format(py_version[0], py_version[1])
             pythonlib = compat.locate_libpython_2(py_version_str_p)
             assert isinstance(pythonlib, str)
             pythonlib = Path(pythonlib)
@@ -310,10 +310,10 @@ def autoimport(sources: List[Union[str, Path]],
         link_options = []
     fill_build_flags(additional_cflags)
     for define in [export_kw, export_init_kw, export_prop_kw, export_init_shared_kw]:
-        additional_cflags["cl"].append(f"/D{define}=")
-        additional_cflags["g++"].append(f"-D{define}=")
-        additional_cflags["clang++"].append(f"-D{define}=")
-        additional_cflags["nvcc"].append(f"-D{define}=")
+        additional_cflags["cl"].append("/D{}=".format(define))
+        additional_cflags["g++"].append("-D{}=".format(define))
+        additional_cflags["clang++"].append("-D{}=".format(define))
+        additional_cflags["nvcc"].append("-D{}=".format(define))
     source_contents = {}
     for path in sources:
         path = Path(path)

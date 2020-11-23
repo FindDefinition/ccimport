@@ -144,8 +144,8 @@ class BaseWritter(Writer):
         rule_name = name + "_cxx"
         self.rule(
             rule_name,
-            f"${compiler_var} -MMD -MT $out -MF $out.d {includes} {cflags} -c $in -o $out {post_cflags}",
-            description=f"compile $out",
+            "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}".format(compiler_var, includes, cflags, post_cflags),
+            description="compile $out",
             depfile="$out.d",
             deps="gcc")
         self.newline()
@@ -161,8 +161,8 @@ class BaseWritter(Writer):
         rule_name = name + "_ld"
         self.rule(
             rule_name,
-            f"${linker_name} $in {libs_str} {libpaths_str} {ldflags} -o $out",
-            description=f"link $out")
+            "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),
+            description="link $out")
         self.newline()
         return rule_name
 
@@ -180,7 +180,7 @@ class BaseWritter(Writer):
         rule_name = name + "_cxx"
         self.rule(
             rule_name,
-            f"${compiler_var} {includes} {cflags} -c $in /Fo$out ${post_cflags}"
+            "${} {} {} -c $in /Fo$out ${}".format(compiler_var, includes, cflags, post_cflags)
         )
         self.newline()
         return rule_name
@@ -196,8 +196,8 @@ class BaseWritter(Writer):
         rule_name = name + "_ld"
         self.rule(
             rule_name,
-            f"${linker_name} /link /nologo $in {libs_str} {libpaths_str} {ldflags} /out:$out ",
-            description=f"link msvc $out")
+            "${} /link /nologo $in {} {} {} /out:$out".format(linker_name, libs_str, libpaths_str, ldflags),
+            description="link msvc $out")
         self.newline()
         return rule_name
 
@@ -214,8 +214,8 @@ class BaseWritter(Writer):
         rule_name = name + "_cuda"
         self.rule(
             rule_name,
-            f"${compiler_var} {includes} {cflags} -c $in -o $out {post_cflags}",
-            description=f"nvcc cxx $out")
+            "${} {} {} -c $in -o $out {}".format(compiler_var, includes, cflags, post_cflags),
+            description="nvcc cxx $out")
         self.newline()
         return rule_name
 
@@ -229,25 +229,25 @@ class BaseWritter(Writer):
         rule_name = name + "_ld"
         self.rule(
             rule_name,
-            f"${linker_name} $in {libs_str} {libpaths_str} {ldflags} -o $out",
-            description=f"link $out")
+            "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),
+            description="link $out")
         self.newline()
         return rule_name
 
     def create_linker_rule(self, linker, target_name, link_opts: LinkOptions):
-        link_name = f"{linker}_{target_name}"
+        link_name = "{}_{}".format(linker, target_name)
         linker_path = None
         if linker in self.linker_to_path:
             linker_path = self.linker_to_path[linker]
         if linker == "g++":
             # ++ can't be used in name
-            link_name = f"gplusplus_{target_name}"
+            link_name = "gplusplus_{}".format(target_name)
             self.variable(link_name,
                           'g++' if linker_path is None else linker_path)
             return self.gcc_link_setup(target_name, linker, link_name,
                                        link_opts)
         elif linker == "clang++":
-            link_name = f"clang_{target_name}"
+            link_name = "clang_{}".format(target_name)
             self.variable(link_name,
                           "clang++" if linker_path is None else linker_path)
             return self.gcc_link_setup(target_name, linker, link_name,
