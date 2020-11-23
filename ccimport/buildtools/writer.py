@@ -548,6 +548,10 @@ def build_simple_ninja(target,
         # print(chunk_or_line.encode("utf-8"))
         if not "ninja: no work to do" in chunk_or_line:
             print(chunk_or_line, end='')
+    proc.wait()
+    if proc.returncode:
+        raise subprocess.CalledProcessError(proc.returncode, cmds)
+
     no_work_to_do = False
     if "ninja: no work to do" in output:
         no_work_to_do = True
