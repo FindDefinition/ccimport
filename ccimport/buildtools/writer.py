@@ -531,9 +531,14 @@ def build_simple_ninja(target,
     cmds = ["ninja"]
     if verbose:
         cmds.append("-v")
-    proc = subprocess.Popen(cmds, cwd=str(build_dir),
-                            stdout=subprocess.PIPE,
-                            text=True)
+    if compat.Python3_7AndLater:
+        proc = subprocess.Popen(cmds, cwd=str(build_dir),
+                                stdout=subprocess.PIPE,
+                                text=True)
+    else:
+        proc = subprocess.Popen(cmds, cwd=str(build_dir),
+                                stdout=subprocess.PIPE,
+                                universal_newlines=True)
     output = ''
     while True:
         chunk_or_line = proc.stdout.readline()
