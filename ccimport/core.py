@@ -135,11 +135,11 @@ def ccimport(source_paths: List[Union[str, Path]],
     build_out_path = build_dir / target_filename
     out_path = out_path.parent / target_filename
     if not no_work:
-        shutil.copy(build_out_path, out_path)
+        shutil.copy(str(build_out_path), str(out_path))
         if compat.InWindows and build_ctype:
             win_lib_file = build_out_path.parent / (build_out_path.stem + ".lib")
             if win_lib_file.exists():
-                shutil.copy(win_lib_file, out_path.parent / win_lib_file.name)
+                shutil.copy(str(win_lib_file), str(out_path.parent / win_lib_file.name))
 
     extension_path = str(out_path)
     if not disable_hash:
@@ -334,8 +334,7 @@ def autoimport(sources: List[Union[str, Path]],
             final_impl_sources.append(s)
     final_source_lines.extend(py_module_code_lines)
     with tempdir() as dirpath:
-        path_to_write = Path(dirpath) / "main.cc"
-        path_to_write = path_to_write.resolve()
+        path_to_write = Path(dirpath).resolve() / "main.cc"
         with path_to_write.open("w") as f:
             f.write("\n".join(final_source_lines))
 
