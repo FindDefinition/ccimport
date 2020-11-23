@@ -17,7 +17,7 @@ DESCRIPTION = 'a tiny package for fast python c++ binding build.'
 URL = 'https://github.com/FindDefinition/ccimport'
 EMAIL = 'yanyan.sub@outlook.com'
 AUTHOR = 'Yan Yan'
-REQUIRES_PYTHON = '>=3.6'
+REQUIRES_PYTHON = '>=3.5'
 VERSION = None
 
 # What packages are required for this module to be executed?
