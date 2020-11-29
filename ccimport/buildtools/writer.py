@@ -156,7 +156,21 @@ class BaseWritter(Writer):
             linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
-        libs_str = " ".join(["-l" + str(l) for l in opts.libs])
+        libs = opts.libs
+        lib_flags = []
+        for l in libs:
+            splits = l.split("::")
+            lib_flag = "-l" + str(splits[-1])
+            if len(splits) == 2:
+                prefix = splits[0]
+                if prefix == "static":
+                    lib_flag = "-l:" + "lib" + splits[-1] + ".a"
+                elif prefix == "path":
+                    lib_flag = splits[-1]
+                else:
+                    raise NotImplementedError("unsupported lib prefix. supported: static and path")
+            lib_flags.append(lib_flag)
+        libs_str = " ".join(lib_flags)
         libpaths_str = " ".join(["-L" + str(l) for l in opts.libpaths])
         rule_name = name + "_ld"
         self.rule(
