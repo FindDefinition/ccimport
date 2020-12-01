@@ -163,10 +163,10 @@ class BaseWritter(Writer):
             lib_flag = "-l" + str(splits[-1])
             if len(splits) == 2:
                 prefix = splits[0]
-                if prefix == "static":
-                    lib_flag = "-l:" + "lib" + splits[-1] + ".a"
-                elif prefix == "path":
+                if prefix == "path":
                     lib_flag = splits[-1]
+                elif prefix == "file":
+                    lib_flag = "-l:" + splits[-1]
                 else:
                     raise NotImplementedError("unsupported lib prefix. supported: static and path")
             lib_flags.append(lib_flag)
@@ -494,6 +494,7 @@ def create_simple_ninja(target,
     linker = _default_linker()
     build_options = _default_build_options()
     link_options = _default_link_options()
+    target = Path(target).resolve()
     if target_filename is None:
         target_filename = _default_target_filename(target, shared)
     else:
