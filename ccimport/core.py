@@ -59,7 +59,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              load_library=True,
              additional_cflags: Optional[Dict[str, List[str]]] = None):
     source_paths = list(map(lambda p: Path(p).resolve(), source_paths))
-    out_path = Path(out_path)
+    out_path = (Path(out_path).parent.resolve() / Path(out_path).stem)
     if source_paths_for_hash is None:
         source_paths_for_hash = source_paths
     source_str_paths = list(map(lambda p: str(p), source_paths_for_hash))

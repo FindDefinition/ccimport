@@ -4,6 +4,8 @@
 
 a tiny package for fast python c++ binding build.
 
+support python 3.5, 3.7-3.9.
+
 ## Usage
 
 ### Limitations in Code
