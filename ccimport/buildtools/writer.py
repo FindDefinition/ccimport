@@ -494,7 +494,7 @@ def create_simple_ninja(target,
     linker = _default_linker()
     build_options = _default_build_options()
     link_options = _default_link_options()
-    target = Path(target).resolve()
+    target = str(Path(target).resolve())
     if target_filename is None:
         target_filename = _default_target_filename(target, shared)
     else:
