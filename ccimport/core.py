@@ -57,7 +57,8 @@ def ccimport(source_paths: List[Union[str, Path]],
              build_ctype=False,
              disable_hash=True,
              load_library=True,
-             additional_cflags: Optional[Dict[str, List[str]]] = None):
+             additional_cflags: Optional[Dict[str, List[str]]] = None,
+             verbose=False):
     source_paths = list(map(lambda p: Path(p).resolve(), source_paths))
     out_path = (Path(out_path).parent.resolve() / Path(out_path).stem)
     if source_paths_for_hash is None:
@@ -131,7 +132,7 @@ def ccimport(source_paths: List[Union[str, Path]],
     target_filename, no_work = build_simple_ninja(lib_name, build_dir, source_paths,
                                          includes, libraries, libpaths,
                                          compile_options, link_options,
-                                         target_filename, additional_cflags)
+                                         target_filename, additional_cflags, verbose=verbose)
     build_out_path = build_dir / target_filename
     out_path = out_path.parent / target_filename
     if not no_work:
@@ -296,7 +297,8 @@ def autoimport(sources: List[Union[str, Path]],
                std="c++14",
                disable_hash=False,
                load_library=True,
-               additional_cflags: Optional[Dict[str, List[str]]] = None):
+               additional_cflags: Optional[Dict[str, List[str]]] = None,
+               verbose=False):
     sources = list(map(lambda p: Path(p).resolve(), sources))
     if includes is None:
         includes = []
@@ -349,5 +351,6 @@ def autoimport(sources: List[Union[str, Path]],
                        source_paths_for_hash=sources,
                        disable_hash=disable_hash,
                        load_library=load_library,
-                       additional_cflags=additional_cflags)
+                       additional_cflags=additional_cflags,
+                       verbose=verbose)
         return mod

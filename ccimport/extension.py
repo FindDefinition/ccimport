@@ -120,9 +120,9 @@ class CCImportBuild(build_ext):
             )
         lib_path = Path(lib_path)
         out_path = out_path.parent / lib_path.name
-        shutil.copy(lib_path, out_path)
+        shutil.copy(str(lib_path), str(out_path))
         if compat.InWindows:
             lib_path = Path(lib_path)
             win_lib_path = lib_path.parent / (lib_path.stem + ".lib")
             if win_lib_path.exists():
-                shutil.copy(win_lib_path, out_path.parent / win_lib_path.name)
+                shutil.copy(str(win_lib_path), str(out_path.parent / win_lib_path.name))
