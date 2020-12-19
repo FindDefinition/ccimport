@@ -8,7 +8,12 @@ from setuptools.command.build_ext import build_ext
 
 import ccimport
 from ccimport import compat
+import abc 
 
+class ExtCallback(abc.ABC):
+    @abc.abstractmethod
+    def __call__(self, ext: Union["AutoImportExtension", "CCImportExtension"], extdir: Path, target_path: Path):
+        pass
 
 class AutoImportExtension(Extension):
     def __init__(self,
@@ -23,6 +28,7 @@ class AutoImportExtension(Extension):
                  std="c++14",
                  additional_cflags: Optional[Dict[str, List[str]]] = None,
                  verbose=False,
+                 extcallback: Optional[ExtCallback] = None,
                  sourcedir='',
                  library_dirs=[]):
         Extension.__init__(self, name, sources=[], library_dirs=library_dirs)
@@ -37,6 +43,7 @@ class AutoImportExtension(Extension):
         self._ccimp_std = std
         self._ccimp_additional_cflags = additional_cflags
         self._ccimp_verbose = verbose
+        self._ccimp_callback = extcallback
 
 
 class CCImportExtension(Extension):
@@ -54,6 +61,7 @@ class CCImportExtension(Extension):
                  additional_cflags: Optional[Dict[str, List[str]]] = None,
                  shared=True,
                  verbose=False,
+                 extcallback: Optional[ExtCallback] = None,
                  sourcedir='',
                  library_dirs=[]):
         Extension.__init__(self, name, sources=[], library_dirs=library_dirs)
@@ -70,6 +78,7 @@ class CCImportExtension(Extension):
         self._ccimp_build_ctype = build_ctype
         self._ccimp_verbose = verbose
         self._ccimp_shared = shared
+        self._ccimp_callback = extcallback
 
 
 class CCImportBuild(build_ext):
@@ -129,6 +138,8 @@ class CCImportBuild(build_ext):
                 shared=ext._ccimp_shared,
             )
         lib_path = Path(lib_path)
+        if ext._ccimp_callback is not None:
+            ext._ccimp_callback(ext, extdir, lib_path)
         out_path = out_path.parent / lib_path.name
         shutil.copy(str(lib_path), str(out_path))
         if compat.InWindows:
