@@ -32,7 +32,12 @@ _PYBIND_COMMON_INCLUDES = [
 ]
 
 
-def get_full_file_name(name, build_ctype):
+def get_full_file_name(name, build_ctype, shared=True):
+    if not shared:
+        if compat.InWindows:
+            return name + ".exe"
+        else:
+            return name
     lib_prefix = ""
     if not compat.InWindows and build_ctype:
         lib_prefix = "lib"
@@ -58,7 +63,10 @@ def ccimport(source_paths: List[Union[str, Path]],
              disable_hash=True,
              load_library=True,
              additional_cflags: Optional[Dict[str, List[str]]] = None,
+             shared=True,
              verbose=False):
+    if not shared:
+        assert load_library is False, "executable can't be loaded to python"
     source_paths = list(map(lambda p: Path(p).resolve(), source_paths))
     out_path = (Path(out_path).parent.resolve() / Path(out_path).stem)
     if source_paths_for_hash is None:
@@ -125,14 +133,15 @@ def ccimport(source_paths: List[Union[str, Path]],
     python_includes = compat.get_pybind11_includes()
     includes.extend(python_includes)
     includes.extend(GLOBAL_CONFIG.includes)
-    target_filename = get_full_file_name(lib_name, build_ctype)
+    target_filename = get_full_file_name(lib_name, build_ctype, shared)
 
     build_dir = out_path.parent / "build"
     build_dir.mkdir(exist_ok=True)
     target_filename, no_work = build_simple_ninja(lib_name, build_dir, source_paths,
                                          includes, libraries, libpaths,
                                          compile_options, link_options,
-                                         target_filename, additional_cflags, verbose=verbose)
+                                         target_filename, additional_cflags, 
+                                         shared=shared, verbose=verbose)
     build_out_path = build_dir / target_filename
     out_path = out_path.parent / target_filename
     if not no_work:

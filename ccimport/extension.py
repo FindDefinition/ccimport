@@ -22,6 +22,7 @@ class AutoImportExtension(Extension):
                  link_options: Optional[List[str]] = None,
                  std="c++14",
                  additional_cflags: Optional[Dict[str, List[str]]] = None,
+                 verbose=False,
                  sourcedir='',
                  library_dirs=[]):
         Extension.__init__(self, name, sources=[], library_dirs=library_dirs)
@@ -35,6 +36,7 @@ class AutoImportExtension(Extension):
         self._ccimp_link_options = link_options
         self._ccimp_std = std
         self._ccimp_additional_cflags = additional_cflags
+        self._ccimp_verbose = verbose
 
 
 class CCImportExtension(Extension):
@@ -50,6 +52,8 @@ class CCImportExtension(Extension):
                  std="c++14",
                  build_ctype=False,
                  additional_cflags: Optional[Dict[str, List[str]]] = None,
+                 shared=True,
+                 verbose=False,
                  sourcedir='',
                  library_dirs=[]):
         Extension.__init__(self, name, sources=[], library_dirs=library_dirs)
@@ -64,6 +68,8 @@ class CCImportExtension(Extension):
         self._ccimp_std = std
         self._ccimp_additional_cflags = additional_cflags
         self._ccimp_build_ctype = build_ctype
+        self._ccimp_verbose = verbose
+        self._ccimp_shared = shared
 
 
 class CCImportBuild(build_ext):
@@ -102,6 +108,7 @@ class CCImportBuild(build_ext):
                 disable_hash=True,
                 load_library=False,
                 additional_cflags=ext._ccimp_additional_cflags,
+                verbose=ext._ccimp_verbose,
             )
         else:
             lib_path = ccimport.ccimport(
@@ -117,6 +124,8 @@ class CCImportBuild(build_ext):
                 load_library=False,
                 build_ctype=ext._ccimp_build_ctype,
                 additional_cflags=ext._ccimp_additional_cflags,
+                verbose=ext._ccimp_verbose,
+                shared=ext._ccimp_shared,
             )
         lib_path = Path(lib_path)
         out_path = out_path.parent / lib_path.name
