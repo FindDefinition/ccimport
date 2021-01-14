@@ -138,8 +138,6 @@ class CCImportBuild(build_ext):
                 shared=ext._ccimp_shared,
             )
         lib_path = Path(lib_path)
-        if ext._ccimp_callback is not None:
-            ext._ccimp_callback(ext, extdir, lib_path)
         out_path = out_path.parent / lib_path.name
         shutil.copy(str(lib_path), str(out_path))
         if compat.InWindows:
@@ -147,3 +145,5 @@ class CCImportBuild(build_ext):
             win_lib_path = lib_path.parent / (lib_path.stem + ".lib")
             if win_lib_path.exists():
                 shutil.copy(str(win_lib_path), str(out_path.parent / win_lib_path.name))
+        if ext._ccimp_callback is not None:
+            ext._ccimp_callback(ext, extdir, out_path)

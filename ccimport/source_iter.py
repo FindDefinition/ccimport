@@ -331,6 +331,8 @@ class CppSourceIterator(object):
         # return: (func_id, param_pair, body_pair)
         state = self.state()
         res = []  # type: List[FunctionDef]
+        func_attr_kw = set(["const", "override", "final"])
+
         for meta in self.find_identifier_prefix(prefix, full_match=full_match):
             self.reset_bracket_count().move(meta.end)
             if find_after:

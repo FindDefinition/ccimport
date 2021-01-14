@@ -106,7 +106,7 @@ class BaseWritter(Writer):
         self._sstream = io.StringIO()
         super().__init__(self._sstream, width)
 
-        self._build_dir = Path(build_dir)
+        self._build_dir = Path(build_dir).resolve()
         self._suffix_to_cl = {}
         self._suffix_to_rule = {}
         self.compiler_build_opts = compiler_build_opts
@@ -538,7 +538,7 @@ def build_simple_ninja(target,
         target, build_dir, sources, includes, libs, libpaths, compile_opts,
         link_opts, target_filename, additional_cflags, additional_lflags,
         suffix_to_compiler, shared)
-    build_dir = Path(build_dir)
+    build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)
     # TODO: check_call don't raise, this is a problem
