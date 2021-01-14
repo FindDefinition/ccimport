@@ -42,6 +42,8 @@ class BuildOptions:
                  cflags: Optional[List[str]] = None,
                  post_cflags: Optional[List[str]] = None):
         self.includes = _list_none(includes)
+        for inc in self.includes:
+            assert Path(inc).exists(), "path {} must exist".format(inc)
         self.cflags = _list_none(cflags)
         self.post_cflags = _list_none(post_cflags)
 
@@ -66,6 +68,8 @@ class BuildOptions:
     def merge(self, opt: "BuildOptions"):
         res = self.copy()
         res.includes.extend(opt.includes)
+        for inc in res.includes:
+            assert Path(inc).exists(), "path {} must exist".format(inc)
         res.cflags.extend(self._override_flags(res.cflags, opt.cflags))
         res.post_cflags.extend(
             self._override_flags(res.post_cflags, opt.post_cflags))
@@ -78,6 +82,8 @@ class LinkOptions:
                  libs: Optional[List[str]] = None,
                  ldflags: Optional[List[str]] = None):
         self.libpaths = _list_none(libpaths)
+        for inc in self.libpaths:
+            assert Path(inc).exists(), "path {} must exist".format(inc)
         self.libs = _list_none(libs)
         self.ldflags = _list_none(ldflags)
 
@@ -90,6 +96,9 @@ class LinkOptions:
         res.libpaths.extend(opt.libpaths)
         res.libs.extend(opt.libs)
         res.ldflags.extend(opt.ldflags)
+        for inc in res.libpaths:
+            assert Path(inc).exists(), "path {} must exist".format(inc)
+
         return res
 
 
@@ -336,8 +345,11 @@ class BaseWritter(Writer):
             target_path = self._build_dir / target_filename
         obj_files = []
         for p in source_paths:
+            assert p.exists()
             suffix = ".o"
-            obj = str(self._build_dir / (p.name + suffix))
+            obj = (self._build_dir / (p.name + suffix)).resolve()
+            assert obj.parent.exists()
+            obj = str(obj)
             obj_files.append(obj)
             rule = path_to_rule[p]
             self.build(obj, rule, str(p))
