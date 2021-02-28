@@ -42,8 +42,6 @@ class BuildOptions:
                  cflags: Optional[List[str]] = None,
                  post_cflags: Optional[List[str]] = None):
         self.includes = _list_none(includes)
-        for inc in self.includes:
-            assert Path(inc).exists(), "path {} must exist".format(inc)
         self.cflags = _list_none(cflags)
         self.post_cflags = _list_none(post_cflags)
 
@@ -68,8 +66,6 @@ class BuildOptions:
     def merge(self, opt: "BuildOptions"):
         res = self.copy()
         res.includes.extend(opt.includes)
-        for inc in res.includes:
-            assert Path(inc).exists(), "path {} must exist".format(inc)
         res.cflags.extend(self._override_flags(res.cflags, opt.cflags))
         res.post_cflags.extend(
             self._override_flags(res.post_cflags, opt.post_cflags))
@@ -82,8 +78,6 @@ class LinkOptions:
                  libs: Optional[List[str]] = None,
                  ldflags: Optional[List[str]] = None):
         self.libpaths = _list_none(libpaths)
-        for inc in self.libpaths:
-            assert Path(inc).exists(), "path {} must exist".format(inc)
         self.libs = _list_none(libs)
         self.ldflags = _list_none(ldflags)
 
@@ -96,9 +90,6 @@ class LinkOptions:
         res.libpaths.extend(opt.libpaths)
         res.libs.extend(opt.libs)
         res.ldflags.extend(opt.ldflags)
-        for inc in res.libpaths:
-            assert Path(inc).exists(), "path {} must exist".format(inc)
-
         return res
 
 
@@ -150,7 +141,7 @@ class BaseWritter(Writer):
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
-        rule_name = name + "_cxx"
+        rule_name = name + "_cxx_{}".format(compiler_var)
         self.rule(
             rule_name,
             "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}".format(compiler_var, includes, cflags, post_cflags),
@@ -181,7 +172,7 @@ class BaseWritter(Writer):
             lib_flags.append(lib_flag)
         libs_str = " ".join(lib_flags)
         libpaths_str = " ".join(["-L" + str(l) for l in opts.libpaths])
-        rule_name = name + "_ld"
+        rule_name = name + "_ld_{}".format(linker_name)
         self.rule(
             rule_name,
             "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),
@@ -200,7 +191,7 @@ class BaseWritter(Writer):
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
-        rule_name = name + "_cxx"
+        rule_name = name + "_cxx_{}".format(compiler_var)
         self.rule(
             rule_name,
             "${} {} {} -c $in /Fo$out ${}".format(compiler_var, includes, cflags, post_cflags)
@@ -216,7 +207,7 @@ class BaseWritter(Writer):
         libs_str = " ".join([str(l) + ".lib" for l in opts.libs])
         libpaths_str = " ".join(
             ["/LIBPATH:\"{}\"".format(str(l)) for l in opts.libpaths])
-        rule_name = name + "_ld"
+        rule_name = name + "_ld_{}".format(linker_name)
         self.rule(
             rule_name,
             "${} /link /nologo $in {} {} {} /out:$out".format(linker_name, libs_str, libpaths_str, ldflags),
@@ -234,7 +225,7 @@ class BaseWritter(Writer):
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
-        rule_name = name + "_cuda"
+        rule_name = name + "_cuda_{}".format(compiler_var)
         self.rule(
             rule_name,
             "${} {} {} -c $in -o $out {}".format(compiler_var, includes, cflags, post_cflags),
@@ -249,7 +240,7 @@ class BaseWritter(Writer):
         ldflags = " ".join(opts.ldflags)
         libs_str = " ".join(["-l" + str(l) for l in opts.libs])
         libpaths_str = " ".join(["-L" + str(l) for l in opts.libpaths])
-        rule_name = name + "_ld"
+        rule_name = name + "_ld_{}".format(linker_name)
         self.rule(
             rule_name,
             "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),

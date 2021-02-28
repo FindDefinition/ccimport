@@ -369,7 +369,10 @@ class CppSourceIterator(object):
                     namespaces.append(ns)
             namespaces.append(meta.name)
             func_id = "::".join(namespaces)
-
+            iden = self.next_identifier()
+            if iden is not None:
+                if iden not in func_attr_kw:
+                    continue 
             curly_pair = self.next_curly()
             if not curly_pair:
                 if decl_only:
