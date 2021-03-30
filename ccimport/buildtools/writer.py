@@ -343,7 +343,7 @@ class BaseWritter(Writer):
         for p in source_paths:
             assert p.exists()
             suffix = ".o"
-            obj = (self._build_dir / (p.name + suffix)).resolve()
+            obj = (self._build_dir / (p.name + suffix))
             assert obj.parent.exists()
             obj = str(obj)
             obj_files.append(obj)
