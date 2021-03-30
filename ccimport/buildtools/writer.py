@@ -136,7 +136,7 @@ class BaseWritter(Writer):
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
-        includes = " ".join(["-I" + str(i) for i in opts.includes])
+        includes = " ".join(["-I \"{}\"".format(str(i)) for i in opts.includes])
         cflags = opts.cflags
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
@@ -171,7 +171,7 @@ class BaseWritter(Writer):
                     raise NotImplementedError("unsupported lib prefix. supported: static and path")
             lib_flags.append(lib_flag)
         libs_str = " ".join(lib_flags)
-        libpaths_str = " ".join(["-L" + str(l) for l in opts.libpaths])
+        libpaths_str = " ".join(["-L \"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
         self.rule(
             rule_name,
@@ -194,7 +194,8 @@ class BaseWritter(Writer):
         rule_name = name + "_cxx_{}".format(compiler_var)
         self.rule(
             rule_name,
-            "${} {} {} -c $in /Fo$out ${}".format(compiler_var, includes, cflags, post_cflags)
+            "${} {} {} /showIncludes -c $in /Fo$out ${}".format(compiler_var, includes, cflags, post_cflags),
+            deps="msvc"
         )
         self.newline()
         return rule_name
@@ -220,16 +221,19 @@ class BaseWritter(Writer):
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
-        includes = " ".join(["-I" + str(i) for i in opts.includes])
+        includes = " ".join(["-I \"{}\"".format(str(i)) for i in opts.includes])
         cflags = opts.cflags
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
         rule_name = name + "_cuda_{}".format(compiler_var)
+        MMD = "-MD" if compat.InWindows else "-MMD"
         self.rule(
             rule_name,
-            "${} {} {} -c $in -o $out {}".format(compiler_var, includes, cflags, post_cflags),
-            description="nvcc cxx $out")
+            "${} {} -MT $out -MF $out.d {} {} -c $in -o $out {}".format(compiler_var, MMD, includes, cflags, post_cflags),
+            description="nvcc cxx $out",
+            depfile="$out.d",
+            deps="gcc")
         self.newline()
         return rule_name
 
@@ -238,9 +242,10 @@ class BaseWritter(Writer):
             linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
-        libs_str = " ".join(["-l" + str(l) for l in opts.libs])
-        libpaths_str = " ".join(["-L" + str(l) for l in opts.libpaths])
+        libs_str = " ".join(["-l \"{}\"".format(str(l)) for l in opts.libs])
+        libpaths_str = " ".join(["-L \"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
+        libpaths_str = " ".join(["-L \"{}\"".format(str(l)) for l in opts.libpaths])
         self.rule(
             rule_name,
             "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),
@@ -379,8 +384,13 @@ def _default_suffix_to_compiler():
 COMMON_NVCC_FLAGS = [
     '-D__CUDA_NO_HALF_OPERATORS__', '-D__CUDA_NO_HALF_CONVERSIONS__',
     '-D__CUDA_NO_HALF2_OPERATORS__', '--expt-relaxed-constexpr',
-    '-Xcompiler=\"-fPIC\"'
+    '-Xcompiler=\"-fPIC\"', '-Xcompiler=\'-O3\''
 ]
+
+COMMON_NVCC_FLAGS_WINDOWS = [
+    '--expt-relaxed-constexpr', '-Xcompiler=\'/O2\''
+]
+
 
 COMMON_MSVC_FLAGS = [
     '/MD', '/wd4819', '/wd4251', '/wd4244', '/wd4267', '/wd4275', '/wd4018',
@@ -397,7 +407,11 @@ COMMON_HIPCC_FLAGS = [
 
 
 def _default_build_options():
-    nvcc_flags = COMMON_NVCC_FLAGS.copy()
+    if compat.InWindows:
+        nvcc_flags = COMMON_NVCC_FLAGS_WINDOWS.copy()
+    else:
+        nvcc_flags = COMMON_NVCC_FLAGS.copy()
+
     if compat.InWindows:
         nvcc_flags.extend("-Xcompiler=\"{}\"".format(c)
                           for c in COMMON_MSVC_FLAGS)
