@@ -3,7 +3,7 @@ import platform
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
-
+import os 
 from ninja.ninja_syntax import Writer
 
 from ccimport import compat
@@ -126,6 +126,7 @@ class BaseWritter(Writer):
 
             self._suffix_to_cl[suffix] = compiler_name
             self._compiler_var_to_name[compiler_name] = compiler
+        self.variable("msvc_deps_prefix",  os.getenv("CCIMPORT_MSVC_DEPS_PREFIX", "Note: including file:"))
 
     @property
     def content(self) -> str:
@@ -194,7 +195,7 @@ class BaseWritter(Writer):
         rule_name = name + "_cxx_{}".format(compiler_var)
         self.rule(
             rule_name,
-            "${} {} {} /showIncludes -c $in /Fo$out ${}".format(compiler_var, includes, cflags, post_cflags),
+            "${} {} {} /showIncludes -c $in /Fo$out {}".format(compiler_var, includes, cflags, post_cflags),
             deps="msvc"
         )
         self.newline()
@@ -388,13 +389,13 @@ COMMON_NVCC_FLAGS = [
 ]
 
 COMMON_NVCC_FLAGS_WINDOWS = [
-    '--expt-relaxed-constexpr', '-Xcompiler=\'/O2\''
+    '--expt-relaxed-constexpr', '-Xcompiler=\"/O2\"'
 ]
 
 
 COMMON_MSVC_FLAGS = [
     '/MD', '/wd4819', '/wd4251', '/wd4244', '/wd4267', '/wd4275', '/wd4018',
-    '/wd4190', '/EHsc'
+    '/wd4190', '/EHsc', '/Zc:__cplusplus'
 ]
 
 COMMON_HIPCC_FLAGS = [

@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-
+import os 
 import pybind11
 from ccimport import compat, loader
 from ccimport.buildtools.writer import build_simple_ninja, fill_build_flags
@@ -64,6 +64,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              load_library=True,
              additional_cflags: Optional[Dict[str, List[str]]] = None,
              shared=True,
+             msvc_deps_prefix="Note: including file:",
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -137,11 +138,16 @@ def ccimport(source_paths: List[Union[str, Path]],
 
     build_dir = out_path.parent / "build"
     build_dir.mkdir(exist_ok=True)
-    target_filename, no_work = build_simple_ninja(lib_name, build_dir, source_paths,
-                                         includes, libraries, libpaths,
-                                         compile_options, link_options,
-                                         target_filename, additional_cflags, 
-                                         shared=shared, verbose=verbose)
+    if "CCIMPORT_MSVC_DEPS_PREFIX" not in os.environ:
+        os.environ["CCIMPORT_MSVC_DEPS_PREFIX"] = msvc_deps_prefix
+    try:
+        target_filename, no_work = build_simple_ninja(lib_name, build_dir, source_paths,
+                                            includes, libraries, libpaths,
+                                            compile_options, link_options,
+                                            target_filename, additional_cflags, 
+                                            shared=shared, verbose=verbose)
+    finally:
+        os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename
     out_path = out_path.parent / target_filename
     if not no_work:
