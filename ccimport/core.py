@@ -63,6 +63,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              disable_hash=True,
              load_library=True,
              additional_cflags: Optional[Dict[str, List[str]]] = None,
+             additional_lflags: Optional[Dict[str, List[str]]] = None,
              shared=True,
              msvc_deps_prefix="Note: including file:",
              verbose=False):
@@ -145,6 +146,7 @@ def ccimport(source_paths: List[Union[str, Path]],
                                             includes, libraries, libpaths,
                                             compile_options, link_options,
                                             target_filename, additional_cflags, 
+                                            additional_lflags,
                                             shared=shared, verbose=verbose)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")

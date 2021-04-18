@@ -56,6 +56,23 @@ def _filter_unsupported_compiler(compilers: List[str]):
             supported.append(c)
     return supported
 
+def _override_flags(major_flags, minor_flags):
+    """if a flag exists in _ALL_OVERRIDE_FLAGS, the one
+    in major flag will override the one in minor.
+    """
+    flag_to_override = set([])
+    for override_flags in _ALL_OVERRIDE_FLAGS:
+        for flag in major_flags:
+            if flag in override_flags:
+                for flag2 in minor_flags:
+                    if flag2 in override_flags:
+                        flag_to_override.add(flag2)
+    new_flags = []
+    for flag2 in minor_flags:
+        if flag2 not in flag_to_override:
+            new_flags.append(flag2)
+    return new_flags
+
 
 class BuildOptions:
     def __init__(self,
@@ -70,26 +87,13 @@ class BuildOptions:
         return BuildOptions(self.includes.copy(), self.cflags.copy(),
                             self.post_cflags.copy())
 
-    def _override_flags(self, major_flags, minor_flags):
-        flag_to_override = set([])
-        for override_flags in _ALL_OVERRIDE_FLAGS:
-            for flag in major_flags:
-                if flag in override_flags:
-                    for flag2 in minor_flags:
-                        if flag2 in override_flags:
-                            flag_to_override.add(flag2)
-        new_flags = []
-        for flag2 in minor_flags:
-            if flag2 not in flag_to_override:
-                new_flags.append(flag2)
-        return new_flags
 
     def merge(self, opt: "BuildOptions"):
         res = self.copy()
         res.includes.extend(opt.includes)
-        res.cflags.extend(self._override_flags(res.cflags, opt.cflags))
+        res.cflags.extend(_override_flags(res.cflags, opt.cflags))
         res.post_cflags.extend(
-            self._override_flags(res.post_cflags, opt.post_cflags))
+            _override_flags(res.post_cflags, opt.post_cflags))
         return res
 
 
