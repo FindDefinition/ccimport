@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import os 
 from ninja.ninja_syntax import Writer
-
+from collections import OrderedDict
 from ccimport import compat
 
 ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++'])
@@ -139,7 +139,9 @@ class BaseWritter(Writer):
         self._compiler_var_to_name = {}
         self.compiler_to_path = compiler_to_path
         self.linker_to_path = linker_to_path
-        for suffix, compiler in suffix_to_compiler.items():
+        suf_to_c_items = list(suffix_to_compiler.items())
+        suf_to_c_items.sort(key=lambda x: x[0])
+        for suffix, compiler in suf_to_c_items:
             compilers = compiler.split(",")
             compiler = _filter_unsupported_compiler(compilers)[0]
             suffix_ = suffix.replace(".", "_")
@@ -508,7 +510,7 @@ def group_dict_by_split(data: Dict[str, List[Any]], split: str = ","):
     """convert {gcc,clang++: [xxx], clang++: [yyy]}
     to {gcc: [xxx], clang++: [xxx, yyy]}
     """
-    new_data = {} # type: Dict[str, List[Any]]
+    new_data = OrderedDict() # type: Dict[str, List[Any]]
     for k, v in data.items():
         ks = k.split(split)
         for k_ in ks:
@@ -548,9 +550,9 @@ def create_simple_ninja(target,
             target_filename = str(path.parent /
                                   _default_target_filename(path.stem, shared))
     writer = BaseWritter(suffix_to_compiler_, build_dir, build_options,
-                         link_options, {}, {})
+                         link_options, OrderedDict(), OrderedDict())
     target_build_opt = BuildOptions(includes, compile_opts)
-    target_build_options = {}
+    target_build_options = OrderedDict()
     additional_cflags = fill_build_flags(additional_cflags)
     additional_lflags = fill_link_flags(additional_lflags)
     additional_cflags = group_dict_by_split(additional_cflags)
