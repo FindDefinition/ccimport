@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Union
 import os 
 import pybind11
 from ccimport import compat, loader
-from ccimport.buildtools.writer import build_simple_ninja, fill_build_flags
+from ccimport.buildtools.writer import build_simple_ninja, fill_build_flags, DEFAULT_MSVC_DEP_PREFIX
 from ccimport.source_iter import CppSourceIterator
 from ccimport.utils import tempdir
 from ccimport.global_cfg import GLOBAL_CONFIG
@@ -65,7 +65,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              additional_cflags: Optional[Dict[str, List[str]]] = None,
              additional_lflags: Optional[Dict[str, List[str]]] = None,
              shared=True,
-             msvc_deps_prefix="Note: including file:",
+             msvc_deps_prefix=DEFAULT_MSVC_DEP_PREFIX,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
