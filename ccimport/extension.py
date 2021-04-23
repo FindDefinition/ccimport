@@ -1,3 +1,4 @@
+import abc
 import os
 import shutil
 from pathlib import Path
@@ -8,12 +9,14 @@ from setuptools.command.build_ext import build_ext
 
 import ccimport
 from ccimport import compat
-import abc 
+
 
 class ExtCallback(abc.ABC):
     @abc.abstractmethod
-    def __call__(self, ext: Union["AutoImportExtension", "CCImportExtension"], extdir: Path, target_path: Path):
+    def __call__(self, ext: Union["AutoImportExtension", "CCImportExtension"],
+                 extdir: Path, target_path: Path):
         pass
+
 
 class AutoImportExtension(Extension):
     def __init__(self,
@@ -144,6 +147,7 @@ class CCImportBuild(build_ext):
             lib_path = Path(lib_path)
             win_lib_path = lib_path.parent / (lib_path.stem + ".lib")
             if win_lib_path.exists():
-                shutil.copy(str(win_lib_path), str(out_path.parent / win_lib_path.name))
+                shutil.copy(str(win_lib_path),
+                            str(out_path.parent / win_lib_path.name))
         if ext._ccimp_callback is not None:
             ext._ccimp_callback(ext, extdir, out_path)

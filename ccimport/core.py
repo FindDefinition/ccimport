@@ -12,18 +12,22 @@ example config in microsoft terminal:
 
 import ctypes
 import json
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-import os 
+
 import pybind11
+
 from ccimport import compat, loader
-from ccimport.buildtools.writer import build_simple_ninja, fill_build_flags, DEFAULT_MSVC_DEP_PREFIX
+from ccimport.buildtools.writer import (DEFAULT_MSVC_DEP_PREFIX,
+                                        build_simple_ninja, fill_build_flags)
+from ccimport.global_cfg import GLOBAL_CONFIG
 from ccimport.source_iter import CppSourceIterator
 from ccimport.utils import tempdir
-from ccimport.global_cfg import GLOBAL_CONFIG
+
 _PYBIND_COMMON_INCLUDES = [
     "#include <pybind11/pybind11.h>",
     "#include <pybind11/stl.h>",
@@ -50,6 +54,7 @@ def get_full_file_name(name, build_ctype, shared=True):
             lib_suffix = ".so"
     return lib_prefix + name + lib_suffix
 
+
 def ccimport(source_paths: List[Union[str, Path]],
              out_path: Union[str, Path],
              includes: Optional[List[Union[str, Path]]] = None,
@@ -66,6 +71,8 @@ def ccimport(source_paths: List[Union[str, Path]],
              additional_lflags: Optional[Dict[str, List[str]]] = None,
              shared=True,
              msvc_deps_prefix=DEFAULT_MSVC_DEP_PREFIX,
+             out_root: Optional[Union[str, Path]] = None,
+             build_dir: Optional[Union[str, Path]] = None,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -136,18 +143,28 @@ def ccimport(source_paths: List[Union[str, Path]],
     includes.extend(python_includes)
     includes.extend(GLOBAL_CONFIG.includes)
     target_filename = get_full_file_name(lib_name, build_ctype, shared)
-
-    build_dir = out_path.parent / "build"
-    build_dir.mkdir(exist_ok=True)
+    if build_dir is not None:
+        build_dir = Path(build_dir)
+    else:
+        build_dir = out_path.parent / "build"
+    build_dir.mkdir(exist_ok=True, parents=True)
     if "CCIMPORT_MSVC_DEPS_PREFIX" not in os.environ:
         os.environ["CCIMPORT_MSVC_DEPS_PREFIX"] = msvc_deps_prefix
     try:
-        target_filename, no_work = build_simple_ninja(lib_name, build_dir, source_paths,
-                                            includes, libraries, libpaths,
-                                            compile_options, link_options,
-                                            target_filename, additional_cflags, 
-                                            additional_lflags,
-                                            shared=shared, verbose=verbose)
+        target_filename, no_work = build_simple_ninja(lib_name,
+                                                      build_dir,
+                                                      source_paths,
+                                                      includes,
+                                                      libraries,
+                                                      libpaths,
+                                                      compile_options,
+                                                      link_options,
+                                                      target_filename,
+                                                      additional_cflags,
+                                                      additional_lflags,
+                                                      out_root=out_root,
+                                                      shared=shared,
+                                                      verbose=verbose)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename
@@ -155,9 +172,11 @@ def ccimport(source_paths: List[Union[str, Path]],
     if not no_work:
         shutil.copy(str(build_out_path), str(out_path))
         if compat.InWindows and build_ctype:
-            win_lib_file = build_out_path.parent / (build_out_path.stem + ".lib")
+            win_lib_file = build_out_path.parent / (build_out_path.stem +
+                                                    ".lib")
             if win_lib_file.exists():
-                shutil.copy(str(win_lib_file), str(out_path.parent / win_lib_file.name))
+                shutil.copy(str(win_lib_file),
+                            str(out_path.parent / win_lib_file.name))
 
     extension_path = str(out_path)
     if not disable_hash:
@@ -177,7 +196,8 @@ def ccimport(source_paths: List[Union[str, Path]],
 
 
 def _parse_sources_get_pybind(lib_name, source_paths, source_contents,
-                              export_kw, export_init_kw, export_init_shared_kw, export_prop_kw):
+                              export_kw, export_init_kw, export_init_shared_kw,
+                              export_prop_kw):
     classes = {}
     outside_methods = []
     path_has_export = []
@@ -194,11 +214,10 @@ def _parse_sources_get_pybind(lib_name, source_paths, source_contents,
                                                        True,
                                                        decl_only=True)
         all_cls_init_defs = [(d, False) for d in all_cls_init_defs]
-        all_cls_shared_init_defs = siter.find_function_prefix(export_init_shared_kw,
-                                                       True,
-                                                       True,
-                                                       decl_only=True)
-        all_cls_shared_init_defs = [(d, True) for d in all_cls_shared_init_defs]
+        all_cls_shared_init_defs = siter.find_function_prefix(
+            export_init_shared_kw, True, True, decl_only=True)
+        all_cls_shared_init_defs = [(d, True)
+                                    for d in all_cls_shared_init_defs]
         all_cls_init_defs += all_cls_shared_init_defs
         all_marked_props = siter.find_marked_identifier(export_prop_kw)
         if all_func_defs or all_cls_init_defs:
@@ -284,7 +303,7 @@ def _parse_sources_get_pybind(lib_name, source_paths, source_contents,
             method_name = method.split("::")[-1]
             class_lines.append("    .def(\"{}\", &{})".format(
                 method_name, method))
-        for prop in v["public_props"]: # .def_readwrite("name", &Pet::name);
+        for prop in v["public_props"]:  # .def_readwrite("name", &Pet::name);
             class_lines.append("    .def_readwrite(\"{}\", &{}::{})".format(
                 prop, k, prop))
 
@@ -300,6 +319,7 @@ def _parse_sources_get_pybind(lib_name, source_paths, source_contents,
     py_module_code_lines += ["}"]
     return py_module_code_lines, path_has_export
 
+
 def autoimport(sources: List[Union[str, Path]],
                out_path: Union[str, Path],
                includes: Optional[List[Union[str, Path]]] = None,
@@ -307,8 +327,8 @@ def autoimport(sources: List[Union[str, Path]],
                libraries: Optional[List[str]] = None,
                export_kw="CODEAI_EXPORT",
                export_init_kw="CODEAI_EXPORT_INIT",
-               export_prop_kw="CODEAI_EXPORT_PROP", 
-               export_init_shared_kw="CODEAI_EXPORT_SHARED_INIT", 
+               export_prop_kw="CODEAI_EXPORT_PROP",
+               export_init_shared_kw="CODEAI_EXPORT_SHARED_INIT",
                compile_options: Optional[List[str]] = None,
                link_options: Optional[List[str]] = None,
                std="c++14",
@@ -328,7 +348,9 @@ def autoimport(sources: List[Union[str, Path]],
     if link_options is None:
         link_options = []
     fill_build_flags(additional_cflags)
-    for define in [export_kw, export_init_kw, export_prop_kw, export_init_shared_kw]:
+    for define in [
+            export_kw, export_init_kw, export_prop_kw, export_init_shared_kw
+    ]:
         additional_cflags["cl"].append("/D{}=".format(define))
         additional_cflags["g++"].append("-D{}=".format(define))
         additional_cflags["clang++"].append("-D{}=".format(define))
@@ -342,8 +364,8 @@ def autoimport(sources: List[Union[str, Path]],
     out_path = Path(out_path)
     lib_name = out_path.stem
     py_module_code_lines, path_has_export = _parse_sources_get_pybind(
-        lib_name, sources, source_contents, export_kw,
-        export_init_kw, export_init_shared_kw, export_prop_kw)
+        lib_name, sources, source_contents, export_kw, export_init_kw,
+        export_init_shared_kw, export_prop_kw)
     final_source_lines = _PYBIND_COMMON_INCLUDES.copy()
     final_impl_sources = []
     for s in sources:

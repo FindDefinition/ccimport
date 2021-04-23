@@ -61,32 +61,45 @@ def find_list_str_prefix(data: List[str], prefix: str, full_match=False):
 
 class IdentifierMeta:
     def __init__(self, name: str, start: int, end: int):
-        self.name = name 
-        self.start = start 
-        self.end = end 
+        self.name = name
+        self.start = start
+        self.end = end
+
 
 class ClassDef:
-    def __init__(self, name: str, keyword_pos: int, body_start: int,
-        body_end: int, local_id: str = "", is_template: bool = False):
-        self.name = name 
-        self.keyword_pos = keyword_pos 
-        self.body_start = body_start 
-        self.body_end = body_end 
-        self.local_id = local_id 
-        self.is_template = is_template 
+    def __init__(self,
+                 name: str,
+                 keyword_pos: int,
+                 body_start: int,
+                 body_end: int,
+                 local_id: str = "",
+                 is_template: bool = False):
+        self.name = name
+        self.keyword_pos = keyword_pos
+        self.body_start = body_start
+        self.body_end = body_end
+        self.local_id = local_id
+        self.is_template = is_template
+
 
 class FunctionDef:
-    def __init__(self, name: str, identifier_pos: int, param_start: int,
-        param_end: int, body_start: int,
-        body_end: int, local_id: str = "", is_template: bool = False):
-        self.name = name 
-        self.identifier_pos = identifier_pos 
-        self.param_start = param_start 
-        self.param_end = param_end 
-        self.body_start = body_start 
-        self.body_end = body_end 
-        self.local_id = local_id 
-        self.is_template = is_template 
+    def __init__(self,
+                 name: str,
+                 identifier_pos: int,
+                 param_start: int,
+                 param_end: int,
+                 body_start: int,
+                 body_end: int,
+                 local_id: str = "",
+                 is_template: bool = False):
+        self.name = name
+        self.identifier_pos = identifier_pos
+        self.param_start = param_start
+        self.param_end = param_end
+        self.body_start = body_start
+        self.body_end = body_end
+        self.local_id = local_id
+        self.is_template = is_template
 
 
 class CppSourceIterator(object):
@@ -151,9 +164,8 @@ class CppSourceIterator(object):
 
     def find_symbols_in_range(self, sym, start, end=None):
         if sym not in self._symbol_to_poses:
-            raise KeyError(
-                "unknown sym {}. available: {}".format(sym, list(self._symbol_to_poses.keys()))
-            )
+            raise KeyError("unknown sym {}. available: {}".format(
+                sym, list(self._symbol_to_poses.keys())))
         poses = self._symbol_to_poses[sym]
         hi = len(poses)
         start_idx = bisect_left(poses, start, 0, hi)
@@ -262,14 +274,15 @@ class CppSourceIterator(object):
                 end_bracket = end_brackets[val]
                 if not bracket_stack[end_bracket]:
                     raise ValueError(
-                        "unbalanced bracket '{}'({}) in your source.".format(val, self.pos)
-                    )
+                        "unbalanced bracket '{}'({}) in your source.".format(
+                            val, self.pos))
                 start_val, start = bracket_stack[end_bracket].pop()
                 pairs.append((start_val, start, self.pos))
             self.pos += 1
             self.skip_string_comment()
         for k, v in bracket_stack.items():
-            assert len(v) == 0, "unbalanced bracket {} in your source.".format(k)
+            assert len(v) == 0, "unbalanced bracket {} in your source.".format(
+                k)
         return pairs, symbol_to_poses
 
     def get_namespace_ranges(self, class_defs: List[ClassDef]):
@@ -372,7 +385,7 @@ class CppSourceIterator(object):
             iden = self.next_identifier()
             if iden is not None:
                 if iden not in func_attr_kw:
-                    continue 
+                    continue
             curly_pair = self.next_curly()
             if not curly_pair:
                 if decl_only:

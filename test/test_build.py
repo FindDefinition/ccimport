@@ -1,8 +1,9 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import ccimport
 from ccimport.utils import tempdir
+
 
 def test_cpp_build():
     source = ccimport.autoimport([Path(__file__).parent / "source.cc"],
@@ -11,12 +12,13 @@ def test_cpp_build():
     obj = source.TestClass(5)
     assert obj.add(3) == 8
 
+
 def test_cpp_exec_build():
     with tempdir() as tempd:
         source = ccimport.ccimport([Path(__file__).parent / "executable.cc"],
-                                    tempd / "executable",
-                                    shared=False,
-                                    load_library=False)
-        
+                                   tempd / "executable",
+                                   shared=False,
+                                   load_library=False)
+
         output = subprocess.check_output([str(source)])
         assert output.decode("utf-8").strip() == "hello ccimport!"

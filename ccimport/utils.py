@@ -2,7 +2,8 @@ import contextlib
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any, Hashable
+from typing import Any, Callable, Dict, Hashable, Optional
+
 
 class HashableRegistry:
     def __init__(self, allow_duplicate=False):
@@ -17,6 +18,7 @@ class HashableRegistry:
             if not self.allow_duplicate and key_ in self.global_dict:
                 raise KeyError("key {} already exists".format(key_))
             self.global_dict[key_] = func
+
         if func is None:
             return wrapper
         else:

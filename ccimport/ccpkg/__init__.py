@@ -2,4 +2,3 @@
 """
 
 from ccimport.utils import HashableRegistry
-

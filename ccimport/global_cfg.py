@@ -1,11 +1,13 @@
-from pathlib import Path 
-from typing import List
-import json 
+import json
 import traceback
+from pathlib import Path
+from typing import List
+
 
 class GlobalConfig:
     def __init__(self, includes: List[str]):
         self.includes = includes
+
 
 GLOBAL_CONFIG_PATH = Path.home() / ".ccimport_global.json"
 GLOBAL_CONFIG = GlobalConfig([])

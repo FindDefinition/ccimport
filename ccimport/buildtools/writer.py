@@ -1,13 +1,15 @@
 import io
+import locale
+import os
 import platform
 import subprocess
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
-import os 
+
 from ninja.ninja_syntax import Writer
-from collections import OrderedDict
+
 from ccimport import compat
-import locale
 
 LOCALE_TO_MSVC_DEP_PREFIX = {
     "en": "Note: including file:",
@@ -24,13 +26,13 @@ if _LOC in LOCALE_TO_MSVC_DEP_PREFIX:
 else:
     _LOC_SPLIT = _LOC.split("_")
     if _LOC_SPLIT[0] in LOCALE_TO_MSVC_DEP_PREFIX:
-        DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC_SPLIT[0]]        
-
+        DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC_SPLIT[0]]
 
 ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++'])
 ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
 
 _ALL_OVERRIDE_FLAGS = (set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]), )
+
 
 def _make_unique_name(unique_set, name, max_count=10000):
     if name not in unique_set:
@@ -53,7 +55,6 @@ class UniqueNamePool:
         return _make_unique_name(self.unique_set, name, self.max_count)
 
 
-
 def _list_none(val):
     if val is None:
         return []
@@ -74,6 +75,7 @@ def _filter_unsupported_compiler(compilers: List[str]):
         if c.strip() in all_supported:
             supported.append(c)
     return supported
+
 
 def _override_flags(major_flags, minor_flags):
     """if a flag exists in _ALL_OVERRIDE_FLAGS, the one
@@ -105,7 +107,6 @@ class BuildOptions:
     def copy(self):
         return BuildOptions(self.includes.copy(), self.cflags.copy(),
                             self.post_cflags.copy())
-
 
     def merge(self, opt: "BuildOptions"):
         res = self.copy()
@@ -145,11 +146,12 @@ class BaseWritter(Writer):
                  compiler_link_opts: Dict[str, LinkOptions],
                  compiler_to_path: Dict[str, str],
                  linker_to_path: Dict[str, str],
+                 out_root: Optional[Union[Path, str]] = None,
                  width=78):
         # TODO check available compilers by subprocess.
         self._sstream = io.StringIO()
         super().__init__(self._sstream, width)
-
+        self.out_root = out_root
         self._build_dir = Path(build_dir).resolve()
         self._suffix_to_cl = {}
         self._suffix_to_rule = {}
@@ -172,7 +174,9 @@ class BaseWritter(Writer):
 
             self._suffix_to_cl[suffix] = compiler_name
             self._compiler_var_to_name[compiler_name] = compiler
-        self.variable("msvc_deps_prefix",  os.getenv("CCIMPORT_MSVC_DEPS_PREFIX", "Note: including file:"))
+        self.variable(
+            "msvc_deps_prefix",
+            os.getenv("CCIMPORT_MSVC_DEPS_PREFIX", "Note: including file:"))
 
     @property
     def content(self) -> str:
@@ -183,7 +187,8 @@ class BaseWritter(Writer):
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
-        includes = " ".join(["-I \"{}\"".format(str(i)) for i in opts.includes])
+        includes = " ".join(
+            ["-I \"{}\"".format(str(i)) for i in opts.includes])
         cflags = opts.cflags
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
@@ -191,7 +196,8 @@ class BaseWritter(Writer):
         rule_name = name + "_cxx_{}".format(compiler_var)
         self.rule(
             rule_name,
-            "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}".format(compiler_var, includes, cflags, post_cflags),
+            "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}".format(
+                compiler_var, includes, cflags, post_cflags),
             description="compile $out",
             depfile="$out.d",
             deps="gcc")
@@ -199,8 +205,7 @@ class BaseWritter(Writer):
         return rule_name
 
     def gcc_link_setup(self, name, linker, linker_name, opts: LinkOptions):
-        global_build_opts = self.compiler_link_opts.get(
-            linker, LinkOptions())
+        global_build_opts = self.compiler_link_opts.get(linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
         libs = opts.libs
@@ -215,15 +220,17 @@ class BaseWritter(Writer):
                 elif prefix == "file":
                     lib_flag = "-l:" + splits[-1]
                 else:
-                    raise NotImplementedError("unsupported lib prefix. supported: static and path")
+                    raise NotImplementedError(
+                        "unsupported lib prefix. supported: static and path")
             lib_flags.append(lib_flag)
         libs_str = " ".join(lib_flags)
-        libpaths_str = " ".join(["-L \"{}\"".format(str(l)) for l in opts.libpaths])
+        libpaths_str = " ".join(
+            ["-L \"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
-        self.rule(
-            rule_name,
-            "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),
-            description="link $out")
+        self.rule(rule_name,
+                  "${} $in {} {} {} -o $out".format(linker_name, libs_str,
+                                                    libpaths_str, ldflags),
+                  description="link $out")
         self.newline()
         return rule_name
 
@@ -239,27 +246,25 @@ class BaseWritter(Writer):
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
         rule_name = name + "_cxx_{}".format(compiler_var)
-        self.rule(
-            rule_name,
-            "${} {} {} /showIncludes -c $in /Fo$out {}".format(compiler_var, includes, cflags, post_cflags),
-            deps="msvc"
-        )
+        self.rule(rule_name,
+                  "${} {} {} /showIncludes -c $in /Fo$out {}".format(
+                      compiler_var, includes, cflags, post_cflags),
+                  deps="msvc")
         self.newline()
         return rule_name
 
     def msvc_link_setup(self, name, linker, linker_name, opts: LinkOptions):
-        global_build_opts = self.compiler_link_opts.get(
-            linker, LinkOptions())
+        global_build_opts = self.compiler_link_opts.get(linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
         libs_str = " ".join([str(l) + ".lib" for l in opts.libs])
         libpaths_str = " ".join(
             ["/LIBPATH:\"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
-        self.rule(
-            rule_name,
-            "${} /link /nologo $in {} {} {} /out:$out".format(linker_name, libs_str, libpaths_str, ldflags),
-            description="link msvc $out")
+        self.rule(rule_name,
+                  "${} /link /nologo $in {} {} {} /out:$out".format(
+                      linker_name, libs_str, libpaths_str, ldflags),
+                  description="link msvc $out")
         self.newline()
         return rule_name
 
@@ -268,35 +273,37 @@ class BaseWritter(Writer):
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
-        includes = " ".join(["-I \"{}\"".format(str(i)) for i in opts.includes])
+        includes = " ".join(
+            ["-I \"{}\"".format(str(i)) for i in opts.includes])
         cflags = opts.cflags
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
         rule_name = name + "_cuda_{}".format(compiler_var)
         MMD = "-MD" if compat.InWindows else "-MMD"
-        self.rule(
-            rule_name,
-            "${} {} -MT $out -MF $out.d {} {} -c $in -o $out {}".format(compiler_var, MMD, includes, cflags, post_cflags),
-            description="nvcc cxx $out",
-            depfile="$out.d",
-            deps="gcc")
+        self.rule(rule_name,
+                  "${} {} -MT $out -MF $out.d {} {} -c $in -o $out {}".format(
+                      compiler_var, MMD, includes, cflags, post_cflags),
+                  description="nvcc cxx $out",
+                  depfile="$out.d",
+                  deps="gcc")
         self.newline()
         return rule_name
 
     def nvcc_link_setup(self, name, linker, linker_name, opts: LinkOptions):
-        global_build_opts = self.compiler_link_opts.get(
-            linker, LinkOptions())
+        global_build_opts = self.compiler_link_opts.get(linker, LinkOptions())
         opts = opts.merge(global_build_opts)
         ldflags = " ".join(opts.ldflags)
         libs_str = " ".join(["-l \"{}\"".format(str(l)) for l in opts.libs])
-        libpaths_str = " ".join(["-L \"{}\"".format(str(l)) for l in opts.libpaths])
+        libpaths_str = " ".join(
+            ["-L \"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
-        libpaths_str = " ".join(["-L \"{}\"".format(str(l)) for l in opts.libpaths])
-        self.rule(
-            rule_name,
-            "${} $in {} {} {} -o $out".format(linker_name, libs_str, libpaths_str, ldflags),
-            description="link $out")
+        libpaths_str = " ".join(
+            ["-L \"{}\"".format(str(l)) for l in opts.libpaths])
+        self.rule(rule_name,
+                  "${} $in {} {} {} -o $out".format(linker_name, libs_str,
+                                                    libpaths_str, ldflags),
+                  description="link $out")
         self.newline()
         return rule_name
 
@@ -391,13 +398,24 @@ class BaseWritter(Writer):
         for p in source_paths:
             assert p.exists()
             suffix = ".o"
-            file_name = name_pool(p.name)
-            obj = (self._build_dir / (file_name + suffix))
-            assert obj.parent.exists()
-            obj = str(obj)
-            obj_files.append(obj)
+            source_out_parent = self._build_dir
+            if self.out_root is not None:
+                out_root = Path(self.out_root)
+                try:
+                    relative = p.parent.relative_to(out_root)
+                    source_out_parent = self._build_dir / relative
+                except ValueError:
+                    source_out_parent = self._build_dir
+            source_out_parent.mkdir(exist_ok=True, parents=True)
+            obj_path_no_suffix = (source_out_parent / (p.name))
+            obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
+            obj_path = obj_path_no_suffix.parent / (obj_path_no_suffix.name +
+                                                    ".o")
+            assert obj_path.parent.exists()
+            obj_path = str(obj_path)
+            obj_files.append(obj_path)
             rule = path_to_rule[p]
-            self.build(obj, rule, str(p))
+            self.build(obj_path, rule, str(p))
         self.newline()
         self.build(str(target_path), link_rule, obj_files)
         self.build(target_name, "phony", str(target_path))
@@ -405,8 +423,8 @@ class BaseWritter(Writer):
 
     def add_shared_target(self, target_name: str,
                           compiler_to_option: Dict[str, BuildOptions], linker,
-                          link_opts: LinkOptions,
-                          sources: List[Union[Path, str]],
+                          link_opts: LinkOptions, sources: List[Union[Path,
+                                                                      str]],
                           target_filename: str):
         return self.add_target(target_name, compiler_to_option, linker,
                                link_opts, sources, target_filename, True)
@@ -436,10 +454,7 @@ COMMON_NVCC_FLAGS = [
     '-Xcompiler=\"-fPIC\"', '-Xcompiler=\'-O3\''
 ]
 
-COMMON_NVCC_FLAGS_WINDOWS = [
-    '--expt-relaxed-constexpr', '-Xcompiler=\"/O2\"'
-]
-
+COMMON_NVCC_FLAGS_WINDOWS = ['--expt-relaxed-constexpr', '-Xcompiler=\"/O2\"']
 
 COMMON_MSVC_FLAGS = [
     '/MD', '/wd4819', '/wd4251', '/wd4244', '/wd4267', '/wd4275', '/wd4018',
@@ -501,8 +516,8 @@ def _default_target_filename(target, shared=True):
             return target
 
 
-def fill_build_flags(build_flags: Optional[Dict[str, List[str]]]
-                     ) -> Dict[str, List[str]]:
+def fill_build_flags(
+        build_flags: Optional[Dict[str, List[str]]]) -> Dict[str, List[str]]:
     """fill compile/link compiler-to-list flags with all compiler.
     """
     if build_flags is None:
@@ -513,8 +528,8 @@ def fill_build_flags(build_flags: Optional[Dict[str, List[str]]]
     return build_flags
 
 
-def fill_link_flags(link_flags: Optional[Dict[str, List[str]]]
-                    ) -> Dict[str, List[str]]:
+def fill_link_flags(
+        link_flags: Optional[Dict[str, List[str]]]) -> Dict[str, List[str]]:
     """fill compile/link compiler-to-list flags with all compiler.
     """
     if link_flags is None:
@@ -529,7 +544,7 @@ def group_dict_by_split(data: Dict[str, List[Any]], split: str = ","):
     """convert {gcc,clang++: [xxx], clang++: [yyy]}
     to {gcc: [xxx], clang++: [xxx, yyy]}
     """
-    new_data = OrderedDict() # type: Dict[str, List[Any]]
+    new_data = OrderedDict()  # type: Dict[str, List[Any]]
     for k, v in data.items():
         ks = k.split(split)
         for k_ in ks:
@@ -552,6 +567,7 @@ def create_simple_ninja(target,
                         additional_cflags=None,
                         additional_lflags=None,
                         suffix_to_compiler=None,
+                        out_root: Optional[Union[Path, str]] = None,
                         shared=False):
     default_suffix_to_compiler = _default_suffix_to_compiler()
     suffix_to_compiler_ = default_suffix_to_compiler
@@ -569,7 +585,7 @@ def create_simple_ninja(target,
             target_filename = str(path.parent /
                                   _default_target_filename(path.stem, shared))
     writer = BaseWritter(suffix_to_compiler_, build_dir, build_options,
-                         link_options, OrderedDict(), OrderedDict())
+                         link_options, OrderedDict(), OrderedDict(), out_root)
     target_build_opt = BuildOptions(includes, compile_opts)
     target_build_options = OrderedDict()
     additional_cflags = fill_build_flags(additional_cflags)
@@ -586,6 +602,7 @@ def create_simple_ninja(target,
                       target_filename, shared)
     return writer.content, target_filename
 
+
 def build_simple_ninja(target,
                        build_dir,
                        sources,
@@ -598,12 +615,13 @@ def build_simple_ninja(target,
                        additional_cflags=None,
                        additional_lflags=None,
                        suffix_to_compiler=None,
+                       out_root: Optional[Union[Path, str]] = None,
                        verbose=False,
                        shared=True):
     ninja_content, target_filename = create_simple_ninja(
         target, build_dir, sources, includes, libs, libpaths, compile_opts,
         link_opts, target_filename, additional_cflags, additional_lflags,
-        suffix_to_compiler, shared)
+        suffix_to_compiler, out_root, shared)
     build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)
@@ -612,11 +630,13 @@ def build_simple_ninja(target,
     if verbose:
         cmds.append("-v")
     if compat.Python3_7AndLater:
-        proc = subprocess.Popen(cmds, cwd=str(build_dir),
+        proc = subprocess.Popen(cmds,
+                                cwd=str(build_dir),
                                 stdout=subprocess.PIPE,
                                 text=True)
     else:
-        proc = subprocess.Popen(cmds, cwd=str(build_dir),
+        proc = subprocess.Popen(cmds,
+                                cwd=str(build_dir),
                                 stdout=subprocess.PIPE,
                                 universal_newlines=True)
     output = ''
