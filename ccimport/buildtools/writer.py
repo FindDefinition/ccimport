@@ -247,7 +247,7 @@ class BaseWritter(Writer):
         post_cflags = " ".join(post_cflags)
         rule_name = name + "_cxx_{}".format(compiler_var)
         self.rule(rule_name,
-                  "${} {} {} /showIncludes -c $in /Fo$out {}".format(
+                  "${} {} {} /nologo /showIncludes -c $in /Fo$out {}".format(
                       compiler_var, includes, cflags, post_cflags),
                   deps="msvc")
         self.newline()
