@@ -94,13 +94,18 @@ def _override_flags(major_flags, minor_flags):
             new_flags.append(flag2)
     return new_flags
 
+def _unify_path(path: Union[str, Path]):
+    path = Path(path)
+    if path.exists():
+        return path.resolve()
+    return path 
 
 class BuildOptions:
     def __init__(self,
                  includes: Optional[List[Union[Path, str]]] = None,
                  cflags: Optional[List[str]] = None,
                  post_cflags: Optional[List[str]] = None):
-        self.includes = _list_none(includes)
+        self.includes = list(map(_unify_path, _list_none(includes)))
         self.cflags = _list_none(cflags)
         self.post_cflags = _list_none(post_cflags)
 
@@ -122,7 +127,7 @@ class LinkOptions:
                  libpaths: Optional[List[Union[Path, str]]] = None,
                  libs: Optional[List[str]] = None,
                  ldflags: Optional[List[str]] = None):
-        self.libpaths = _list_none(libpaths)
+        self.libpaths = list(map(_unify_path, _list_none(libpaths)))
         self.libs = _list_none(libs)
         self.ldflags = _list_none(ldflags)
 
@@ -215,13 +220,13 @@ class BaseWritter(Writer):
             lib_flag = "-l" + str(splits[-1])
             if len(splits) == 2:
                 prefix = splits[0]
-                if prefix == "path":
-                    lib_flag = splits[-1]
-                elif prefix == "file":
+                if prefix == "file":
                     lib_flag = "-l:" + splits[-1]
+                elif prefix == "raw":
+                    lib_flag = splits[-1]
                 else:
                     raise NotImplementedError(
-                        "unsupported lib prefix. supported: static and path")
+                        "unsupported lib prefix. supported: file/raw::your_flag")
             lib_flags.append(lib_flag)
         libs_str = " ".join(lib_flags)
         libpaths_str = " ".join(
@@ -406,7 +411,7 @@ class BaseWritter(Writer):
                     source_out_parent = self._build_dir / relative
                 except ValueError:
                     source_out_parent = self._build_dir
-            source_out_parent.mkdir(exist_ok=True, parents=True)
+            source_out_parent.mkdir(exist_ok=True, parents=True, mode=0o755)
             obj_path_no_suffix = (source_out_parent / (p.name))
             obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
             obj_path = obj_path_no_suffix.parent / (obj_path_no_suffix.name +

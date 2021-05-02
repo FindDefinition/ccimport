@@ -101,8 +101,8 @@ class CCImportBuild(build_ext):
             os.makedirs(self.build_temp)
         build_out_path = Path.cwd() / Path(
             self.build_temp) / ext._ccimp_out_relative_path
-        build_out_path.parent.mkdir(exist_ok=True, parents=True)
-        out_path.parent.mkdir(exist_ok=True, parents=True)
+        build_out_path.parent.mkdir(exist_ok=True, parents=True, mode=0o755)
+        out_path.parent.mkdir(exist_ok=True, parents=True, mode=0o755)
         libpaths = []
         for l in ext._ccimp_libpaths:
             if isinstance(l, str):

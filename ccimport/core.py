@@ -147,7 +147,7 @@ def ccimport(source_paths: List[Union[str, Path]],
         build_dir = Path(build_dir)
     else:
         build_dir = out_path.parent / "build"
-    build_dir.mkdir(exist_ok=True, parents=True)
+    build_dir.mkdir(exist_ok=True, parents=True, mode=0o755)
     if "CCIMPORT_MSVC_DEPS_PREFIX" not in os.environ:
         os.environ["CCIMPORT_MSVC_DEPS_PREFIX"] = msvc_deps_prefix
     try:
