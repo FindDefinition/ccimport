@@ -504,7 +504,7 @@ class BaseWritter(Writer):
                 valid_source_use_pch = [] # type: List[Path]
                 for source_path in sources_use_pch:
                     assert source_path.exists()
-                    suffix = p.suffix
+                    suffix = source_path.suffix
                     compiler_var = self._suffix_to_compiler_var[suffix]
                     compiler = self._compiler_var_to_compiler[compiler_var]
                     if compiler == pch_compiler:
@@ -522,7 +522,7 @@ class BaseWritter(Writer):
                         self.build(pch_obj_path, pch_rule_name, str(pch_path))
                     for source_path in sources_use_pch:
                         assert source_path.exists()
-                        suffix = p.suffix
+                        suffix = source_path.suffix
                         compiler_var = self._suffix_to_compiler_var[suffix]
                         compiler = self._compiler_var_to_compiler[compiler_var]
                         if compiler == pch_compiler:

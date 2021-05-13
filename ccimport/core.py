@@ -75,6 +75,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              build_dir: Optional[Union[str, Path]] = None,
              pch_to_sources: Optional[Dict[Union[str, Path],
                                            List[Union[str, Path]]]] = None,
+             suffix_to_compiler: Optional[Dict[str, List[str]]] = None,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -166,6 +167,7 @@ def ccimport(source_paths: List[Union[str, Path]],
             additional_cflags,
             additional_lflags,
             out_root=out_root,
+            suffix_to_compiler=suffix_to_compiler,
             shared=shared,
             verbose=verbose,
             pch_to_sources=pch_to_sources)
