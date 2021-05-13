@@ -34,6 +34,7 @@ ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
 _ALL_OVERRIDE_FLAGS = (set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]), )
 
 ALL_SUPPORTED_PCH_COMPILER = set(['g++', 'clang++'])
+PCH_COMPILER_NEED_SOURCE = set(['cl'])
 
 COMPILER_TO_PCH_SUFFIX = {
     "clang++": ".pch",
@@ -288,8 +289,6 @@ class BaseWritter(Writer):
                          opts: BuildOptions,
                          pch: bool = False,
                          use_pch: bool = False):
-        if pch or use_pch:
-            raise NotImplementedError
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
@@ -304,11 +303,20 @@ class BaseWritter(Writer):
             rule_name += "_pch"
         if use_pch:
             rule_name += "_with_pch"
+        compile_stmt = "${} {} {} /nologo /showIncludes -c $in /Fo$out {}"
+        if pch:
+            compile_stmt = "${} {} {} /nologo /showIncludes -c $in /Yc$out {}"
+        if use_pch:
+            compile_stmt = "${} {} {} /nologo /showIncludes /Yu$pch -c $in /Fo$out {}"
+            self.rule(rule_name,
+                    compile_stmt.format(
+                        compiler_var, includes, cflags, post_cflags))
+        else:
+            self.rule(rule_name,
+                    compile_stmt.format(
+                        compiler_var, includes, cflags, post_cflags),
+                    deps="msvc")
 
-        self.rule(rule_name,
-                  "${} {} {} /nologo /showIncludes -c $in /Fo$out {}".format(
-                      compiler_var, includes, cflags, post_cflags),
-                  deps="msvc")
         self.newline()
         return rule_name
 
@@ -493,6 +501,7 @@ class BaseWritter(Writer):
             for pch_path, sources_use_pch in unified_pch_to_sources.items():
                 assert pch_path.exists()
                 pch_valid_count = 0
+                valid_source_use_pch = [] # type: List[Path]
                 for source_path in sources_use_pch:
                     assert source_path.exists()
                     suffix = p.suffix
@@ -500,13 +509,17 @@ class BaseWritter(Writer):
                     compiler = self._compiler_var_to_compiler[compiler_var]
                     if compiler == pch_compiler:
                         pch_valid_count += 1
+                        valid_source_use_pch.append(source_path)
                 if pch_valid_count > 1:
                     pch_obj_path = str(
                         self._create_output_path(
                             pch_path,
                             name_pool,
                             suffix=COMPILER_TO_PCH_SUFFIX[pch_compiler]))
-                    self.build(pch_obj_path, pch_rule_name, str(pch_path))
+                    if pch_compiler in PCH_COMPILER_NEED_SOURCE:
+                        self.build(pch_obj_path, pch_rule_name, [str(pch_path)] + valid_source_use_pch)
+                    else:
+                        self.build(pch_obj_path, pch_rule_name, str(pch_path))
                     for source_path in sources_use_pch:
                         assert source_path.exists()
                         suffix = p.suffix
