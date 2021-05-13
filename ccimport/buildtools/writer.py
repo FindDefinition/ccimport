@@ -33,6 +33,13 @@ ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
 
 _ALL_OVERRIDE_FLAGS = (set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]), )
 
+ALL_SUPPORTED_PCH_COMPILER = set(['g++', 'clang++'])
+
+COMPILER_TO_PCH_SUFFIX = {
+    "clang++": ".pch",
+    "g++": ".gch",
+}
+
 
 def _make_unique_name(unique_set, name, max_count=10000):
     if name not in unique_set:
@@ -94,11 +101,13 @@ def _override_flags(major_flags, minor_flags):
             new_flags.append(flag2)
     return new_flags
 
+
 def _unify_path(path: Union[str, Path]):
     path = Path(path)
     if path.exists():
         return path.resolve()
-    return path 
+    return path
+
 
 class BuildOptions:
     def __init__(self,
@@ -158,11 +167,13 @@ class BaseWritter(Writer):
         super().__init__(self._sstream, width)
         self.out_root = out_root
         self._build_dir = Path(build_dir).resolve()
-        self._suffix_to_cl = {}
+        self._suffix_to_compiler_var = {}
         self._suffix_to_rule = {}
         self.compiler_build_opts = compiler_build_opts
         self.compiler_link_opts = compiler_link_opts
-        self._compiler_var_to_name = {}
+        self._compiler_var_to_compiler = {}
+        self._compiler_to_compiler_var = {}
+
         self.compiler_to_path = compiler_to_path
         self.linker_to_path = linker_to_path
         suf_to_c_items = list(suffix_to_compiler.items())
@@ -177,8 +188,10 @@ class BaseWritter(Writer):
             else:
                 self.variable(compiler_name, compiler)
 
-            self._suffix_to_cl[suffix] = compiler_name
-            self._compiler_var_to_name[compiler_name] = compiler
+            self._suffix_to_compiler_var[suffix] = compiler_name
+            self._compiler_var_to_compiler[compiler_name] = compiler
+            self._compiler_to_compiler_var[compiler] = compiler_name
+
         self.variable(
             "msvc_deps_prefix",
             os.getenv("CCIMPORT_MSVC_DEPS_PREFIX", "Note: including file:"))
@@ -187,25 +200,53 @@ class BaseWritter(Writer):
     def content(self) -> str:
         return self._sstream.getvalue()
 
-    def gcc_build_setup(self, name, compiler, compiler_var,
-                        opts: BuildOptions):
+    def gcc_build_setup(self,
+                        name,
+                        compiler,
+                        compiler_var,
+                        opts: BuildOptions,
+                        pch: bool = False,
+                        use_pch: bool = False):
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
         includes = " ".join(
             ["-I \"{}\"".format(str(i)) for i in opts.includes])
-        cflags = opts.cflags
+        cflags = opts.cflags.copy()
         post_cflags = opts.post_cflags
+        if pch:
+            # remove_flags = ["-fPIC", "-O3", "-std=c++14"]
+            # for f in remove_flags:
+            #     if f in cflags:
+            #         cflags.remove(f)
+            cflags.append("-x")
+            cflags.append("c++-header")
+
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
+
         rule_name = name + "_cxx_{}".format(compiler_var)
-        self.rule(
-            rule_name,
-            "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}".format(
-                compiler_var, includes, cflags, post_cflags),
-            description="compile $out",
-            depfile="$out.d",
-            deps="gcc")
+        if pch:
+            rule_name += "_pch"
+        if use_pch:
+            rule_name += "_with_pch"
+        compile_stmt = "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}"
+        if use_pch:
+            compile_stmt = "${} -MMD -MT $out -MF $out.d {} {} -include $pch -c $in -o $out {}"
+        if pch:
+            compile_stmt = "${} {} {} -c $in -o $out {}"
+            self.rule(rule_name,
+                      compile_stmt.format(compiler_var, includes, cflags,
+                                          post_cflags),
+                      description="compile pch $out")
+        else:
+            self.rule(rule_name,
+                      compile_stmt.format(compiler_var, includes, cflags,
+                                          post_cflags),
+                      description="compile $out",
+                      depfile="$out.d",
+                      deps="gcc")
+
         self.newline()
         return rule_name
 
@@ -226,7 +267,8 @@ class BaseWritter(Writer):
                     lib_flag = splits[-1]
                 else:
                     raise NotImplementedError(
-                        "unsupported lib prefix. supported: file/raw::your_flag")
+                        "unsupported lib prefix. supported: file/raw::your_flag"
+                    )
             lib_flags.append(lib_flag)
         libs_str = " ".join(lib_flags)
         libpaths_str = " ".join(
@@ -239,8 +281,15 @@ class BaseWritter(Writer):
         self.newline()
         return rule_name
 
-    def msvc_build_setup(self, name, compiler, compiler_var,
-                         opts: BuildOptions):
+    def msvc_build_setup(self,
+                         name,
+                         compiler,
+                         compiler_var,
+                         opts: BuildOptions,
+                         pch: bool = False,
+                         use_pch: bool = False):
+        if pch or use_pch:
+            raise NotImplementedError
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
@@ -251,6 +300,11 @@ class BaseWritter(Writer):
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
         rule_name = name + "_cxx_{}".format(compiler_var)
+        if pch:
+            rule_name += "_pch"
+        if use_pch:
+            rule_name += "_with_pch"
+
         self.rule(rule_name,
                   "${} {} {} /nologo /showIncludes -c $in /Fo$out {}".format(
                       compiler_var, includes, cflags, post_cflags),
@@ -273,8 +327,14 @@ class BaseWritter(Writer):
         self.newline()
         return rule_name
 
-    def nvcc_build_setup(self, name, compiler, compiler_var,
-                         opts: BuildOptions):
+    def nvcc_build_setup(self,
+                         name,
+                         compiler,
+                         compiler_var,
+                         opts: BuildOptions,
+                         pch: bool = False,
+                         use_pch: bool = False):
+        assert not pch and not use_pch, "nvcc don't support pch"
         global_build_opts = self.compiler_build_opts.get(
             compiler, BuildOptions())
         opts = opts.merge(global_build_opts)
@@ -343,20 +403,37 @@ class BaseWritter(Writer):
         else:
             raise NotImplementedError
 
-    def create_build_rule(self, compiler_name, target_name,
-                          opts: BuildOptions):
-        compiler = self._compiler_var_to_name[compiler_name]
+    def create_build_rule(self,
+                          compiler_name,
+                          target_name,
+                          opts: BuildOptions,
+                          pch: bool = False,
+                          use_pch: bool = False):
+        compiler = self._compiler_var_to_compiler[compiler_name]
         if compiler == "g++" or compiler == "clang++":
             # self.variable(compiler_name, "g++")
             return self.gcc_build_setup(target_name, compiler, compiler_name,
-                                        opts)
+                                        opts, pch, use_pch)
         elif compiler == "cl":
             # self.variable(compiler_name, "cl")
             return self.msvc_build_setup(target_name, compiler, compiler_name,
-                                         opts)
+                                         opts, pch, use_pch)
         elif compiler == "nvcc":
             # self.variable(compiler_name, "nvcc")
             return self.nvcc_build_setup(target_name, compiler, compiler_name,
+                                         opts, pch, use_pch)
+        else:
+            raise NotImplementedError
+
+    def create_pch_rule(self, compiler_name, target_name, opts: BuildOptions):
+        compiler = self._compiler_var_to_compiler[compiler_name]
+        if compiler == "g++":
+            # self.variable(compiler_name, "g++")
+            return self.gcc_build_setup(target_name, compiler, compiler_name,
+                                        opts)
+        elif compiler == "clang++":
+            # self.variable(compiler_name, "cl")
+            return self.msvc_build_setup(target_name, compiler, compiler_name,
                                          opts)
         else:
             raise NotImplementedError
@@ -368,22 +445,101 @@ class BaseWritter(Writer):
                    link_opts: LinkOptions,
                    sources: List[Union[Path, str]],
                    target_filename: str,
-                   shared=False):
-        source_paths = [Path(p) for p in sources]
+                   shared=False,
+                   pch_to_sources: Optional[Dict[Union[str, Path],
+                                                 List[Union[str,
+                                                            Path]]]] = None):
+        source_paths = [_unify_path(p) for p in sources]
+        if pch_to_sources is None:
+            pch_to_sources = {}
+        unified_pch_to_sources = {}  # type: Dict[Path, List[Path]]
+        for k, v in pch_to_sources.items():
+            k_u = _unify_path(k)
+            if k_u not in unified_pch_to_sources:
+                unified_pch_to_sources[k_u] = []
+            unified_pch_to_sources[k_u].extend(_unify_path(p) for p in v)
         path_to_rule = {}
-        compiler_to_rule = {}
+        pch_to_rule = {}
+        compiler_to_rule = {}  # type: Dict[str, str]
+        compiler_to_pch_rule = {}  # type: Dict[str, str]
+
+        pch_rule_name = ""
+        path_to_pch_obj = {}
+        path_to_pch = {}
+
         self.newline()
+        # determine PCH compiler
+        pch_compiler = ""
+        for pch_sources in unified_pch_to_sources.values():
+            pch_compiler_determined = False
+            for p in pch_sources:
+                suffix = p.suffix
+                compiler_var = self._suffix_to_compiler_var[suffix]
+                compiler = self._compiler_var_to_compiler[compiler_var]
+                if compiler in ALL_SUPPORTED_PCH_COMPILER:
+                    pch_compiler = compiler
+                    pch_compiler_determined = True
+                    break
+            if pch_compiler_determined:
+                break
+        name_pool = UniqueNamePool()
+        if pch_compiler:
+            pch_compiler_name = self._compiler_to_compiler_var[pch_compiler]
+            pch_rule_name = self.create_build_rule(
+                pch_compiler_name,
+                target_name,
+                compiler_to_option[pch_compiler],
+                pch=True)
+            for pch_path, sources_use_pch in unified_pch_to_sources.items():
+                assert pch_path.exists()
+                pch_valid_count = 0
+                for source_path in sources_use_pch:
+                    assert source_path.exists()
+                    suffix = p.suffix
+                    compiler_var = self._suffix_to_compiler_var[suffix]
+                    compiler = self._compiler_var_to_compiler[compiler_var]
+                    if compiler == pch_compiler:
+                        pch_valid_count += 1
+                if pch_valid_count > 1:
+                    pch_obj_path = str(
+                        self._create_output_path(
+                            pch_path,
+                            name_pool,
+                            suffix=COMPILER_TO_PCH_SUFFIX[pch_compiler]))
+                    self.build(pch_obj_path, pch_rule_name, str(pch_path))
+                    for source_path in sources_use_pch:
+                        assert source_path.exists()
+                        suffix = p.suffix
+                        compiler_var = self._suffix_to_compiler_var[suffix]
+                        compiler = self._compiler_var_to_compiler[compiler_var]
+                        if compiler == pch_compiler:
+                            path_to_pch_obj[source_path] = str(pch_obj_path)
+                            path_to_pch[source_path] = str(pch_path)
+
         for p in source_paths:
             suffix = p.suffix
-            compiler_var = self._suffix_to_cl[suffix]
-            compiler = self._compiler_var_to_name[compiler_var]
-            if compiler in compiler_to_rule:
-                rule_name = compiler_to_rule[compiler]
+            compiler_var = self._suffix_to_compiler_var[suffix]
+            compiler = self._compiler_var_to_compiler[compiler_var]
+            if p in path_to_pch_obj and compiler == pch_compiler:
+                if compiler in compiler_to_pch_rule:
+                    rule_name = compiler_to_pch_rule[compiler]
+                else:
+                    compiler = self._compiler_var_to_compiler[compiler_var]
+                    rule_name = self.create_build_rule(
+                        compiler_var,
+                        target_name,
+                        compiler_to_option[compiler],
+                        use_pch=True)
+                    compiler_to_pch_rule[compiler] = rule_name
             else:
-                compiler = self._compiler_var_to_name[compiler_var]
-                rule_name = self.create_build_rule(
-                    compiler_var, target_name, compiler_to_option[compiler])
-                compiler_to_rule[compiler] = rule_name
+                if compiler in compiler_to_rule:
+                    rule_name = compiler_to_rule[compiler]
+                else:
+                    compiler = self._compiler_var_to_compiler[compiler_var]
+                    rule_name = self.create_build_rule(
+                        compiler_var, target_name,
+                        compiler_to_option[compiler])
+                    compiler_to_rule[compiler] = rule_name
             path_to_rule[p] = rule_name
         # for k, v in compiler_to_option.items():
         link_opts = link_opts.copy()
@@ -399,32 +555,47 @@ class BaseWritter(Writer):
         else:
             target_path = self._build_dir / target_filename
         obj_files = []
-        name_pool = UniqueNamePool()
         for p in source_paths:
             assert p.exists()
-            suffix = ".o"
-            source_out_parent = self._build_dir
-            if self.out_root is not None:
-                out_root = Path(self.out_root)
-                try:
-                    relative = p.parent.relative_to(out_root)
-                    source_out_parent = self._build_dir / relative
-                except ValueError:
-                    source_out_parent = self._build_dir
-            source_out_parent.mkdir(exist_ok=True, parents=True, mode=0o755)
-            obj_path_no_suffix = (source_out_parent / (p.name))
-            obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
-            obj_path = obj_path_no_suffix.parent / (obj_path_no_suffix.name +
-                                                    ".o")
-            assert obj_path.parent.exists()
-            obj_path = str(obj_path)
+            obj_path = str(self._create_output_path(p, name_pool))
             obj_files.append(obj_path)
             rule = path_to_rule[p]
-            self.build(obj_path, rule, str(p))
+            if p in path_to_pch_obj:
+                pch_obj = path_to_pch_obj[p]
+                pch_path = path_to_pch[p]
+
+                self.build(obj_path,
+                           rule,
+                           str(p),
+                           variables={"pch": pch_path},
+                           implicit=[pch_obj])
+            else:
+                self.build(obj_path, rule, str(p))
+
         self.newline()
         self.build(str(target_path), link_rule, obj_files)
         self.build(target_name, "phony", str(target_path))
         self.default(target_name)
+
+    def _create_output_path(self,
+                            p: Path,
+                            name_pool: UniqueNamePool,
+                            suffix: str = ".o"):
+        source_out_parent = self._build_dir
+        if self.out_root is not None:
+            out_root = Path(self.out_root)
+            try:
+                relative = p.parent.relative_to(out_root)
+                source_out_parent = self._build_dir / relative
+            except ValueError:
+                source_out_parent = self._build_dir
+        source_out_parent.mkdir(exist_ok=True, parents=True, mode=0o755)
+        obj_path_no_suffix = (source_out_parent / (p.name))
+        obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
+        obj_path = obj_path_no_suffix.parent / (obj_path_no_suffix.name +
+                                                suffix)
+        assert obj_path.parent.exists()
+        return obj_path
 
     def add_shared_target(self, target_name: str,
                           compiler_to_option: Dict[str, BuildOptions], linker,
@@ -560,20 +731,23 @@ def group_dict_by_split(data: Dict[str, List[Any]], split: str = ","):
     return new_data
 
 
-def create_simple_ninja(target,
-                        build_dir,
-                        sources,
-                        includes=None,
-                        libs=None,
-                        libpaths=None,
-                        compile_opts=None,
-                        link_opts=None,
-                        target_filename=None,
-                        additional_cflags=None,
-                        additional_lflags=None,
-                        suffix_to_compiler=None,
-                        out_root: Optional[Union[Path, str]] = None,
-                        shared=False):
+def create_simple_ninja(
+    target,
+    build_dir,
+    sources,
+    includes=None,
+    libs=None,
+    libpaths=None,
+    compile_opts=None,
+    link_opts=None,
+    target_filename=None,
+    additional_cflags=None,
+    additional_lflags=None,
+    suffix_to_compiler=None,
+    out_root: Optional[Union[Path, str]] = None,
+    shared=False,
+    pch_to_sources: Optional[Dict[Union[str, Path],
+                                  List[Union[str, Path]]]] = None):
     default_suffix_to_compiler = _default_suffix_to_compiler()
     suffix_to_compiler_ = default_suffix_to_compiler
     if suffix_to_compiler is not None:
@@ -604,29 +778,32 @@ def create_simple_ninja(target,
     link_opts = LinkOptions(libpaths, libs, link_opts)
     link_opts.ldflags.extend(additional_lflags[linker])
     writer.add_target(target, target_build_options, linker, link_opts, sources,
-                      target_filename, shared)
+                      target_filename, shared, pch_to_sources)
     return writer.content, target_filename
 
 
-def build_simple_ninja(target,
-                       build_dir,
-                       sources,
-                       includes=None,
-                       libs=None,
-                       libpaths=None,
-                       compile_opts=None,
-                       link_opts=None,
-                       target_filename=None,
-                       additional_cflags=None,
-                       additional_lflags=None,
-                       suffix_to_compiler=None,
-                       out_root: Optional[Union[Path, str]] = None,
-                       verbose=False,
-                       shared=True):
+def build_simple_ninja(
+    target,
+    build_dir,
+    sources,
+    includes=None,
+    libs=None,
+    libpaths=None,
+    compile_opts=None,
+    link_opts=None,
+    target_filename=None,
+    additional_cflags=None,
+    additional_lflags=None,
+    suffix_to_compiler=None,
+    out_root: Optional[Union[Path, str]] = None,
+    verbose=False,
+    shared=True,
+    pch_to_sources: Optional[Dict[Union[str, Path],
+                                  List[Union[str, Path]]]] = None):
     ninja_content, target_filename = create_simple_ninja(
         target, build_dir, sources, includes, libs, libpaths, compile_opts,
         link_opts, target_filename, additional_cflags, additional_lflags,
-        suffix_to_compiler, out_root, shared)
+        suffix_to_compiler, out_root, shared, pch_to_sources)
     build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)

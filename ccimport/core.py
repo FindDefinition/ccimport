@@ -73,6 +73,8 @@ def ccimport(source_paths: List[Union[str, Path]],
              msvc_deps_prefix=DEFAULT_MSVC_DEP_PREFIX,
              out_root: Optional[Union[str, Path]] = None,
              build_dir: Optional[Union[str, Path]] = None,
+             pch_to_sources: Optional[Dict[Union[str, Path],
+                                           List[Union[str, Path]]]] = None,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -151,20 +153,22 @@ def ccimport(source_paths: List[Union[str, Path]],
     if "CCIMPORT_MSVC_DEPS_PREFIX" not in os.environ:
         os.environ["CCIMPORT_MSVC_DEPS_PREFIX"] = msvc_deps_prefix
     try:
-        target_filename, no_work = build_simple_ninja(lib_name,
-                                                      build_dir,
-                                                      source_paths,
-                                                      includes,
-                                                      libraries,
-                                                      libpaths,
-                                                      compile_options,
-                                                      link_options,
-                                                      target_filename,
-                                                      additional_cflags,
-                                                      additional_lflags,
-                                                      out_root=out_root,
-                                                      shared=shared,
-                                                      verbose=verbose)
+        target_filename, no_work = build_simple_ninja(
+            lib_name,
+            build_dir,
+            source_paths,
+            includes,
+            libraries,
+            libpaths,
+            compile_options,
+            link_options,
+            target_filename,
+            additional_cflags,
+            additional_lflags,
+            out_root=out_root,
+            shared=shared,
+            verbose=verbose,
+            pch_to_sources=pch_to_sources)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename
