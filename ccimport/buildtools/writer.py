@@ -219,10 +219,6 @@ class BaseWritter(Writer):
         cflags = opts.cflags.copy()
         post_cflags = opts.post_cflags
         if pch:
-            # remove_flags = ["-fPIC", "-O3", "-std=c++14"]
-            # for f in remove_flags:
-            #     if f in cflags:
-            #         cflags.remove(f)
             cflags.append("-x")
             cflags.append("c++-header")
 
@@ -239,19 +235,14 @@ class BaseWritter(Writer):
         compile_stmt = "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}"
         if use_pch:
             compile_stmt = "${} -MMD -MT $out -MF $out.d {} {} -include $pch -c $in -o $out {}"
-        if pch:
-            compile_stmt = "${} {} {} -c $in -o $out {}"
-            self.rule(rule_name,
-                      compile_stmt.format(compiler_var, includes, cflags,
-                                          post_cflags),
-                      description=desc)
-        else:
-            self.rule(rule_name,
-                      compile_stmt.format(compiler_var, includes, cflags,
-                                          post_cflags),
-                      description=desc,
-                      depfile="$out.d",
-                      deps="gcc")
+        # if pch:
+        #     compile_stmt = "${} {} {} -c $in -o $out {}"
+        self.rule(rule_name,
+                    compile_stmt.format(compiler_var, includes, cflags,
+                                        post_cflags),
+                    description=desc,
+                    depfile="$out.d",
+                    deps="gcc")
 
         self.newline()
         return rule_name
@@ -318,17 +309,11 @@ class BaseWritter(Writer):
             desc = "[MSVC][c++/pch]$pchobj|$out"
         if use_pch:
             compile_stmt = "${} {} {} /nologo /showIncludes -c /Yu$pch /Fp$pchobj $in /Fo$out {}"
-            self.rule(rule_name,
-                      compile_stmt.format(compiler_var, includes, cflags,
-                                          post_cflags),
-                      deps="msvc",
-                      description=desc)
-        else:
-            self.rule(rule_name,
-                      compile_stmt.format(compiler_var, includes, cflags,
-                                          post_cflags),
-                      deps="msvc",
-                      description=desc)
+        self.rule(rule_name,
+                    compile_stmt.format(compiler_var, includes, cflags,
+                                        post_cflags),
+                    deps="msvc",
+                    description=desc)
 
         self.newline()
         return rule_name
