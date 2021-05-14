@@ -20,11 +20,15 @@ def test_cpp_exec_build():
             Path(__file__).parent / "source.cc"
         ]
         p2s = {Path(__file__).parent / "some_pch.h": sources}
+        pch_to_include = {Path(__file__).parent / "some_pch.h": "some_pch.h"}
         source = ccimport.ccimport(sources,
                                    tempd / "executable",
+                                   includes=[Path(__file__).parent],
                                    shared=False,
                                    load_library=False,
-                                   pch_to_sources=p2s)
+                                   pch_to_sources=p2s,
+                                   pch_to_include=pch_to_include,
+                                   verbose=False)
 
         output = subprocess.check_output([str(source)])
         assert output.decode("utf-8").strip() == "hello ccimport!"

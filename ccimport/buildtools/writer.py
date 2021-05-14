@@ -314,13 +314,14 @@ class BaseWritter(Writer):
         compile_stmt = "${} {} {} /nologo /showIncludes -c $in /Fo$out {}"
         desc = "[MSVC][c++]$out"
         if pch:
-            compile_stmt = "${} {} {} /nologo /showIncludes -c /Yc$pch $in /Fp$pchobj /Fo$out {}"
+            compile_stmt = "${} {} {} /nologo /showIncludes -c /Yc$pch /Fp$pchobj $in /Fo$out {}"
             desc = "[MSVC][c++/pch]$pchobj|$out"
         if use_pch:
             compile_stmt = "${} {} {} /nologo /showIncludes -c /Yu$pch /Fp$pchobj $in /Fo$out {}"
             self.rule(rule_name,
                       compile_stmt.format(compiler_var, includes, cflags,
                                           post_cflags),
+                      deps="msvc",
                       description=desc)
         else:
             self.rule(rule_name,
@@ -476,7 +477,8 @@ class BaseWritter(Writer):
                    pch_to_include: Optional[Dict[Union[str, Path],
                                                  str]] = None):
         source_paths = [_unify_path(p) for p in sources]
-        pch_to_include = {_unify_path(p): v for p, v in pch_to_include.items()}
+        if pch_to_include is not None:
+            pch_to_include = {_unify_path(p): v for p, v in pch_to_include.items()}
         if pch_to_sources is None:
             pch_to_sources = {}
         unified_pch_to_sources = {}  # type: Dict[Path, List[Path]]
@@ -486,7 +488,6 @@ class BaseWritter(Writer):
                 unified_pch_to_sources[k_u] = []
             unified_pch_to_sources[k_u].extend(_unify_path(p) for p in v)
         path_to_rule = {}
-        pch_to_rule = {}
         compiler_to_rule = {}  # type: Dict[str, str]
         compiler_to_pch_rule = {}  # type: Dict[str, str]
 
@@ -542,9 +543,15 @@ class BaseWritter(Writer):
                         # create a stub file for this include
                         stub_file = self._create_msvc_stub_path(
                             pch_path, name_pool)
-                        with stub_file.open("w") as f:
-                            f.write("#include <{}>".format(
-                                pch_to_include[pch_path]))
+                        write_stub = True
+                        stub_content = "#include <{}>".format(pch_to_include[pch_path])
+                        if stub_file.exists():
+                            with stub_file.open("r") as f:
+                                data = f.read().strip()
+                            write_stub = data != stub_content.strip()
+                        if write_stub:
+                            with stub_file.open("w") as f:
+                                f.write(stub_content)
                         stub_obj_file = str(stub_file.parent /
                                             (stub_file.name + ".o"))
                         self.build(stub_obj_file,
@@ -638,8 +645,10 @@ class BaseWritter(Writer):
                 self.build(obj_path, rule, str(p))
 
         self.newline()
+        stub_obj_files_list = list(stub_obj_files)
+        stub_obj_files_list.sort()
         self.build(str(target_path), link_rule,
-                   obj_files + list(stub_obj_files))
+                   obj_files + stub_obj_files_list)
         self.build(target_name, "phony", str(target_path))
         self.default(target_name)
 
