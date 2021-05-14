@@ -33,11 +33,12 @@ ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
 
 _ALL_OVERRIDE_FLAGS = (set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]), )
 
-ALL_SUPPORTED_PCH_COMPILER = set(['g++', 'clang++'])
+ALL_SUPPORTED_PCH_COMPILER = set(['g++', 'clang++', 'cl'])
 PCH_COMPILER_NEED_SOURCE = set(['cl'])
 
 COMPILER_TO_PCH_SUFFIX = {
     "clang++": ".pch",
+    "cl": ".pch",
     "g++": ".gch",
 }
 
@@ -162,12 +163,14 @@ class BaseWritter(Writer):
                  compiler_to_path: Dict[str, str],
                  linker_to_path: Dict[str, str],
                  out_root: Optional[Union[Path, str]] = None,
+                 msvc_stub_dir: str = "msvc_stub",
                  width=78):
         # TODO check available compilers by subprocess.
         self._sstream = io.StringIO()
         super().__init__(self._sstream, width)
         self.out_root = out_root
         self._build_dir = Path(build_dir).resolve()
+        self._msvc_stub_dir = self._build_dir / msvc_stub_dir
         self._suffix_to_compiler_var = {}
         self._suffix_to_rule = {}
         self.compiler_build_opts = compiler_build_opts
@@ -227,8 +230,10 @@ class BaseWritter(Writer):
         post_cflags = " ".join(post_cflags)
 
         rule_name = name + "_cxx_{}".format(compiler_var)
+        desc = "[GCC][c++]$out"
         if pch:
             rule_name += "_pch"
+            desc = "[GCC][c++/pch]$out"
         if use_pch:
             rule_name += "_with_pch"
         compile_stmt = "${} -MMD -MT $out -MF $out.d {} {} -c $in -o $out {}"
@@ -239,12 +244,12 @@ class BaseWritter(Writer):
             self.rule(rule_name,
                       compile_stmt.format(compiler_var, includes, cflags,
                                           post_cflags),
-                      description="compile pch $out")
+                      description=desc)
         else:
             self.rule(rule_name,
                       compile_stmt.format(compiler_var, includes, cflags,
                                           post_cflags),
-                      description="compile $out",
+                      description=desc,
                       depfile="$out.d",
                       deps="gcc")
 
@@ -275,10 +280,12 @@ class BaseWritter(Writer):
         libpaths_str = " ".join(
             ["-L \"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
+        desc = "[GCC][Link]$out"
+
         self.rule(rule_name,
                   "${} $in {} {} {} -o $out".format(linker_name, libs_str,
                                                     libpaths_str, ldflags),
-                  description="link $out")
+                  description=desc)
         self.newline()
         return rule_name
 
@@ -295,6 +302,7 @@ class BaseWritter(Writer):
         includes = " ".join(
             ["/I \"{}\"".format(str(i)) for i in opts.includes])
         cflags = opts.cflags
+
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
@@ -304,18 +312,22 @@ class BaseWritter(Writer):
         if use_pch:
             rule_name += "_with_pch"
         compile_stmt = "${} {} {} /nologo /showIncludes -c $in /Fo$out {}"
+        desc = "[MSVC][c++]$out"
         if pch:
-            compile_stmt = "${} {} {} /nologo /showIncludes -c $in /Yc$out {}"
+            compile_stmt = "${} {} {} /nologo /showIncludes -c /Yc$pch $in /Fp$pchobj /Fo$out {}"
+            desc = "[MSVC][c++/pch]$pchobj|$out"
         if use_pch:
-            compile_stmt = "${} {} {} /nologo /showIncludes /Yu$pch -c $in /Fo$out {}"
+            compile_stmt = "${} {} {} /nologo /showIncludes -c /Yu$pch /Fp$pchobj $in /Fo$out {}"
             self.rule(rule_name,
-                    compile_stmt.format(
-                        compiler_var, includes, cflags, post_cflags))
+                      compile_stmt.format(compiler_var, includes, cflags,
+                                          post_cflags),
+                      description=desc)
         else:
             self.rule(rule_name,
-                    compile_stmt.format(
-                        compiler_var, includes, cflags, post_cflags),
-                    deps="msvc")
+                      compile_stmt.format(compiler_var, includes, cflags,
+                                          post_cflags),
+                      deps="msvc",
+                      description=desc)
 
         self.newline()
         return rule_name
@@ -328,10 +340,12 @@ class BaseWritter(Writer):
         libpaths_str = " ".join(
             ["/LIBPATH:\"{}\"".format(str(l)) for l in opts.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
+        desc = "[MSVC][Link]$out"
+
         self.rule(rule_name,
                   "${} /link /nologo $in {} {} {} /out:$out".format(
                       linker_name, libs_str, libpaths_str, ldflags),
-                  description="link msvc $out")
+                  description=desc)
         self.newline()
         return rule_name
 
@@ -354,10 +368,11 @@ class BaseWritter(Writer):
         post_cflags = " ".join(post_cflags)
         rule_name = name + "_cuda_{}".format(compiler_var)
         MMD = "-MD" if compat.InWindows else "-MMD"
+        desc = "[NVCC][c++]$out"
         self.rule(rule_name,
                   "${} {} -MT $out -MF $out.d {} {} -c $in -o $out {}".format(
                       compiler_var, MMD, includes, cflags, post_cflags),
-                  description="nvcc cxx $out",
+                  description=desc,
                   depfile="$out.d",
                   deps="gcc")
         self.newline()
@@ -373,10 +388,11 @@ class BaseWritter(Writer):
         rule_name = name + "_ld_{}".format(linker_name)
         libpaths_str = " ".join(
             ["-L \"{}\"".format(str(l)) for l in opts.libpaths])
+        desc = "[NVCC][Link]$out"
         self.rule(rule_name,
                   "${} $in {} {} {} -o $out".format(linker_name, libs_str,
                                                     libpaths_str, ldflags),
-                  description="link $out")
+                  description=desc)
         self.newline()
         return rule_name
 
@@ -456,8 +472,11 @@ class BaseWritter(Writer):
                    shared=False,
                    pch_to_sources: Optional[Dict[Union[str, Path],
                                                  List[Union[str,
-                                                            Path]]]] = None):
+                                                            Path]]]] = None,
+                   pch_to_include: Optional[Dict[Union[str, Path],
+                                                 str]] = None):
         source_paths = [_unify_path(p) for p in sources]
+        pch_to_include = {_unify_path(p): v for p, v in pch_to_include.items()}
         if pch_to_sources is None:
             pch_to_sources = {}
         unified_pch_to_sources = {}  # type: Dict[Path, List[Path]]
@@ -474,6 +493,7 @@ class BaseWritter(Writer):
         pch_rule_name = ""
         path_to_pch_obj = {}
         path_to_pch = {}
+        path_to_pch_stub_obj = {}
 
         self.newline()
         # determine PCH compiler
@@ -501,7 +521,7 @@ class BaseWritter(Writer):
             for pch_path, sources_use_pch in unified_pch_to_sources.items():
                 assert pch_path.exists()
                 pch_valid_count = 0
-                valid_source_use_pch = [] # type: List[Path]
+                valid_source_use_pch = []  # type: List[Path]
                 for source_path in sources_use_pch:
                     assert source_path.exists()
                     suffix = source_path.suffix
@@ -516,8 +536,24 @@ class BaseWritter(Writer):
                             pch_path,
                             name_pool,
                             suffix=COMPILER_TO_PCH_SUFFIX[pch_compiler]))
-                    if pch_compiler in PCH_COMPILER_NEED_SOURCE:
-                        self.build(pch_obj_path, pch_rule_name, [str(pch_path)] + valid_source_use_pch)
+                    stub_obj_file = None
+                    if pch_compiler == "cl":
+                        assert pch_to_include is not None
+                        # create a stub file for this include
+                        stub_file = self._create_msvc_stub_path(
+                            pch_path, name_pool)
+                        with stub_file.open("w") as f:
+                            f.write("#include <{}>".format(
+                                pch_to_include[pch_path]))
+                        stub_obj_file = str(stub_file.parent /
+                                            (stub_file.name + ".o"))
+                        self.build(stub_obj_file,
+                                   pch_rule_name,
+                                   str(stub_file),
+                                   variables={
+                                       "pch": pch_to_include[pch_path],
+                                       'pchobj': pch_obj_path
+                                   })
                     else:
                         self.build(pch_obj_path, pch_rule_name, str(pch_path))
                     for source_path in sources_use_pch:
@@ -528,6 +564,9 @@ class BaseWritter(Writer):
                         if compiler == pch_compiler:
                             path_to_pch_obj[source_path] = str(pch_obj_path)
                             path_to_pch[source_path] = str(pch_path)
+                            if pch_compiler == "cl":
+                                path_to_pch_stub_obj[
+                                    source_path] = stub_obj_file
 
         for p in source_paths:
             suffix = p.suffix
@@ -568,6 +607,7 @@ class BaseWritter(Writer):
         else:
             target_path = self._build_dir / target_filename
         obj_files = []
+        stub_obj_files = set()
         for p in source_paths:
             assert p.exists()
             obj_path = str(self._create_output_path(p, name_pool))
@@ -576,17 +616,30 @@ class BaseWritter(Writer):
             if p in path_to_pch_obj:
                 pch_obj = path_to_pch_obj[p]
                 pch_path = path_to_pch[p]
+                if pch_compiler == "cl":
+                    stub = path_to_pch_stub_obj[p]
+                    stub_obj_files.add(stub)
+                    self.build(obj_path,
+                               rule,
+                               str(p),
+                               variables={
+                                   "pch": pch_to_include[Path(pch_path)],
+                                   "pchobj": pch_obj
+                               },
+                               implicit=[stub])
+                else:
+                    self.build(obj_path,
+                               rule,
+                               str(p),
+                               variables={"pch": pch_path},
+                               implicit=[pch_obj])
 
-                self.build(obj_path,
-                           rule,
-                           str(p),
-                           variables={"pch": pch_path},
-                           implicit=[pch_obj])
             else:
                 self.build(obj_path, rule, str(p))
 
         self.newline()
-        self.build(str(target_path), link_rule, obj_files)
+        self.build(str(target_path), link_rule,
+                   obj_files + list(stub_obj_files))
         self.build(target_name, "phony", str(target_path))
         self.default(target_name)
 
@@ -602,6 +655,26 @@ class BaseWritter(Writer):
                 source_out_parent = self._build_dir / relative
             except ValueError:
                 source_out_parent = self._build_dir
+        source_out_parent.mkdir(exist_ok=True, parents=True, mode=0o755)
+        obj_path_no_suffix = (source_out_parent / (p.name))
+        obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
+        obj_path = obj_path_no_suffix.parent / (obj_path_no_suffix.name +
+                                                suffix)
+        assert obj_path.parent.exists()
+        return obj_path
+
+    def _create_msvc_stub_path(self,
+                               p: Path,
+                               name_pool: UniqueNamePool,
+                               suffix: str = ".cc"):
+        source_out_parent = self._msvc_stub_dir
+        if self.out_root is not None:
+            out_root = Path(self.out_root)
+            try:
+                relative = p.parent.relative_to(out_root)
+                source_out_parent = self._msvc_stub_dir / relative
+            except ValueError:
+                source_out_parent = self._msvc_stub_dir
         source_out_parent.mkdir(exist_ok=True, parents=True, mode=0o755)
         obj_path_no_suffix = (source_out_parent / (p.name))
         obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
@@ -745,22 +818,23 @@ def group_dict_by_split(data: Dict[str, List[Any]], split: str = ","):
 
 
 def create_simple_ninja(
-    target,
-    build_dir,
-    sources,
-    includes=None,
-    libs=None,
-    libpaths=None,
-    compile_opts=None,
-    link_opts=None,
-    target_filename=None,
-    additional_cflags=None,
-    additional_lflags=None,
-    suffix_to_compiler=None,
-    out_root: Optional[Union[Path, str]] = None,
-    shared=False,
-    pch_to_sources: Optional[Dict[Union[str, Path],
-                                  List[Union[str, Path]]]] = None):
+        target,
+        build_dir,
+        sources,
+        includes=None,
+        libs=None,
+        libpaths=None,
+        compile_opts=None,
+        link_opts=None,
+        target_filename=None,
+        additional_cflags=None,
+        additional_lflags=None,
+        suffix_to_compiler=None,
+        out_root: Optional[Union[Path, str]] = None,
+        shared=False,
+        pch_to_sources: Optional[Dict[Union[str, Path],
+                                      List[Union[str, Path]]]] = None,
+        pch_to_include: Optional[Dict[Union[str, Path], str]] = None):
     default_suffix_to_compiler = _default_suffix_to_compiler()
     suffix_to_compiler_ = default_suffix_to_compiler
     if suffix_to_compiler is not None:
@@ -791,32 +865,33 @@ def create_simple_ninja(
     link_opts = LinkOptions(libpaths, libs, link_opts)
     link_opts.ldflags.extend(additional_lflags[linker])
     writer.add_target(target, target_build_options, linker, link_opts, sources,
-                      target_filename, shared, pch_to_sources)
+                      target_filename, shared, pch_to_sources, pch_to_include)
     return writer.content, target_filename
 
 
 def build_simple_ninja(
-    target,
-    build_dir,
-    sources,
-    includes=None,
-    libs=None,
-    libpaths=None,
-    compile_opts=None,
-    link_opts=None,
-    target_filename=None,
-    additional_cflags=None,
-    additional_lflags=None,
-    suffix_to_compiler=None,
-    out_root: Optional[Union[Path, str]] = None,
-    verbose=False,
-    shared=True,
-    pch_to_sources: Optional[Dict[Union[str, Path],
-                                  List[Union[str, Path]]]] = None):
+        target,
+        build_dir,
+        sources,
+        includes=None,
+        libs=None,
+        libpaths=None,
+        compile_opts=None,
+        link_opts=None,
+        target_filename=None,
+        additional_cflags=None,
+        additional_lflags=None,
+        suffix_to_compiler=None,
+        out_root: Optional[Union[Path, str]] = None,
+        verbose=False,
+        shared=True,
+        pch_to_sources: Optional[Dict[Union[str, Path],
+                                      List[Union[str, Path]]]] = None,
+        pch_to_include: Optional[Dict[Union[str, Path], str]] = None):
     ninja_content, target_filename = create_simple_ninja(
         target, build_dir, sources, includes, libs, libpaths, compile_opts,
         link_opts, target_filename, additional_cflags, additional_lflags,
-        suffix_to_compiler, out_root, shared, pch_to_sources)
+        suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include)
     build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)

@@ -15,7 +15,10 @@ def test_cpp_build():
 
 def test_cpp_exec_build():
     with tempdir() as tempd:
-        sources = [Path(__file__).parent / "executable.cc", Path(__file__).parent / "source.cc"]
+        sources = [
+            Path(__file__).parent / "executable.cc",
+            Path(__file__).parent / "source.cc"
+        ]
         p2s = {Path(__file__).parent / "some_pch.h": sources}
         source = ccimport.ccimport(sources,
                                    tempd / "executable",
@@ -25,6 +28,7 @@ def test_cpp_exec_build():
 
         output = subprocess.check_output([str(source)])
         assert output.decode("utf-8").strip() == "hello ccimport!"
+
 
 if __name__ == "__main__":
     test_cpp_exec_build()

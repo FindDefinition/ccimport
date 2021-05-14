@@ -75,6 +75,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              build_dir: Optional[Union[str, Path]] = None,
              pch_to_sources: Optional[Dict[Union[str, Path],
                                            List[Union[str, Path]]]] = None,
+             pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
              suffix_to_compiler: Optional[Dict[str, List[str]]] = None,
              verbose=False):
     if not shared:
@@ -170,7 +171,8 @@ def ccimport(source_paths: List[Union[str, Path]],
             suffix_to_compiler=suffix_to_compiler,
             shared=shared,
             verbose=verbose,
-            pch_to_sources=pch_to_sources)
+            pch_to_sources=pch_to_sources,
+            pch_to_include=pch_to_include)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename
