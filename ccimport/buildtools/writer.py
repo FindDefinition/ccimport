@@ -238,11 +238,11 @@ class BaseWritter(Writer):
         # if pch:
         #     compile_stmt = "${} {} {} -c $in -o $out {}"
         self.rule(rule_name,
-                    compile_stmt.format(compiler_var, includes, cflags,
-                                        post_cflags),
-                    description=desc,
-                    depfile="$out.d",
-                    deps="gcc")
+                  compile_stmt.format(compiler_var, includes, cflags,
+                                      post_cflags),
+                  description=desc,
+                  depfile="$out.d",
+                  deps="gcc")
 
         self.newline()
         return rule_name
@@ -310,10 +310,10 @@ class BaseWritter(Writer):
         if use_pch:
             compile_stmt = "${} {} {} /nologo /showIncludes -c /Yu$pch /Fp$pchobj $in /Fo$out {}"
         self.rule(rule_name,
-                    compile_stmt.format(compiler_var, includes, cflags,
-                                        post_cflags),
-                    deps="msvc",
-                    description=desc)
+                  compile_stmt.format(compiler_var, includes, cflags,
+                                      post_cflags),
+                  deps="msvc",
+                  description=desc)
 
         self.newline()
         return rule_name
@@ -349,6 +349,8 @@ class BaseWritter(Writer):
         includes = " ".join(
             ["-I \"{}\"".format(str(i)) for i in opts.includes])
         cflags = opts.cflags
+        if "-keep" in cflags or "--keep" in cflags:
+            cflags.append("--keep-dir $builddir")
         post_cflags = opts.post_cflags
         cflags = " ".join(cflags)
         post_cflags = " ".join(post_cflags)
@@ -463,7 +465,10 @@ class BaseWritter(Writer):
                                                  str]] = None):
         source_paths = [_unify_path(p) for p in sources]
         if pch_to_include is not None:
-            pch_to_include = {_unify_path(p): v for p, v in pch_to_include.items()}
+            pch_to_include = {
+                _unify_path(p): v
+                for p, v in pch_to_include.items()
+            }
         if pch_to_sources is None:
             pch_to_sources = {}
         unified_pch_to_sources = {}  # type: Dict[Path, List[Path]]
@@ -529,7 +534,8 @@ class BaseWritter(Writer):
                         stub_file = self._create_msvc_stub_path(
                             pch_path, name_pool)
                         write_stub = True
-                        stub_content = "#include <{}>".format(pch_to_include[pch_path])
+                        stub_content = "#include <{}>".format(
+                            pch_to_include[pch_path])
                         if stub_file.exists():
                             with stub_file.open("r") as f:
                                 data = f.read().strip()
@@ -616,18 +622,27 @@ class BaseWritter(Writer):
                                str(p),
                                variables={
                                    "pch": pch_to_include[Path(pch_path)],
-                                   "pchobj": pch_obj
+                                   "pchobj": pch_obj,
+                                   "builddir": str(p.parent),
                                },
                                implicit=[stub])
                 else:
                     self.build(obj_path,
                                rule,
                                str(p),
-                               variables={"pch": pch_path},
+                               variables={
+                                   "pch": pch_path,
+                                   "builddir": str(p.parent),
+                               },
                                implicit=[pch_obj])
 
             else:
-                self.build(obj_path, rule, str(p))
+                self.build(obj_path,
+                           rule,
+                           str(p),
+                           variables={
+                               "builddir": str(p.parent),
+                           })
 
         self.newline()
         stub_obj_files_list = list(stub_obj_files)
