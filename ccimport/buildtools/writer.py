@@ -947,9 +947,17 @@ def run_simple_ninja(target,
                      link_opts=None,
                      target_filename=None,
                      additional_cflags=None):
-    ninja_content, target_filename = create_simple_ninja(
-        target, build_dir, sources, includes, libs, libpaths, compile_opts,
-        link_opts, target_filename, additional_cflags, False)
+    ninja_content, target_filename = create_simple_ninja(target,
+                                                         build_dir,
+                                                         sources,
+                                                         includes,
+                                                         libs,
+                                                         libpaths,
+                                                         compile_opts,
+                                                         link_opts,
+                                                         target_filename,
+                                                         additional_cflags,
+                                                         shared=False)
     build_dir = Path(build_dir)
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)
