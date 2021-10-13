@@ -4,7 +4,8 @@
 
 a tiny package for fast python c++ binding build.
 
-support python 3.5, 3.7-3.9.
+ccimport 0.2.x support python 3.5.
+ccimport >= 0.3 support python 3.6-3.9.
 
 ## Usage
 

@@ -168,7 +168,11 @@ class BaseWritter(Writer):
         # TODO check available compilers by subprocess.
         self._sstream = io.StringIO()
         super().__init__(self._sstream, width)
-        self.out_root = out_root
+        if out_root is None:
+            self.out_root: Optional[Path] = None 
+        else:
+            self.out_root: Optional[Path] = Path(out_root).resolve()
+
         self._build_dir = Path(build_dir).resolve()
         self._msvc_stub_dir = self._build_dir / msvc_stub_dir
         self._suffix_to_compiler_var = {}
@@ -658,7 +662,7 @@ class BaseWritter(Writer):
                             suffix: str = ".o"):
         source_out_parent = self._build_dir
         if self.out_root is not None:
-            out_root = Path(self.out_root)
+            out_root = self.out_root
             try:
                 relative = p.parent.relative_to(out_root)
                 source_out_parent = self._build_dir / relative
@@ -678,7 +682,7 @@ class BaseWritter(Writer):
                                suffix: str = ".cc"):
         source_out_parent = self._msvc_stub_dir
         if self.out_root is not None:
-            out_root = Path(self.out_root)
+            out_root = self.out_root
             try:
                 relative = p.parent.relative_to(out_root)
                 source_out_parent = self._msvc_stub_dir / relative
