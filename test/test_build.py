@@ -28,7 +28,8 @@ def test_cpp_exec_build():
                                    load_library=False,
                                    pch_to_sources=p2s,
                                    pch_to_include=pch_to_include,
-                                   verbose=False)
+                                   verbose=False,
+                                   objects_folder="objects")
 
         output = subprocess.check_output([str(source)])
         assert output.decode("utf-8").strip() == "hello ccimport!"

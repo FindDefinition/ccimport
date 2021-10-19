@@ -77,6 +77,7 @@ def ccimport(source_paths: List[Union[str, Path]],
                                            List[Union[str, Path]]]] = None,
              pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
              suffix_to_compiler: Optional[Dict[str, List[str]]] = None,
+             objects_folder: Optional[Union[str, Path]] = None,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -172,7 +173,8 @@ def ccimport(source_paths: List[Union[str, Path]],
             shared=shared,
             verbose=verbose,
             pch_to_sources=pch_to_sources,
-            pch_to_include=pch_to_include)
+            pch_to_include=pch_to_include,
+            objects_folder=objects_folder)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename

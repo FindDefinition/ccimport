@@ -164,12 +164,13 @@ class BaseWritter(Writer):
                  linker_to_path: Dict[str, str],
                  out_root: Optional[Union[Path, str]] = None,
                  msvc_stub_dir: str = "msvc_stub",
+                 objects_folder: Optional[Union[str, Path]] = None,
                  width=78):
         # TODO check available compilers by subprocess.
         self._sstream = io.StringIO()
         super().__init__(self._sstream, width)
         if out_root is None:
-            self.out_root: Optional[Path] = None 
+            self.out_root: Optional[Path] = None
         else:
             self.out_root: Optional[Path] = Path(out_root).resolve()
 
@@ -184,6 +185,11 @@ class BaseWritter(Writer):
 
         self.compiler_to_path = compiler_to_path
         self.linker_to_path = linker_to_path
+        self.objects_folder = None if objects_folder is None else Path(
+            objects_folder)
+        if self.objects_folder is not None:
+            assert not self.objects_folder.is_absolute(
+            ), "objects_folder must be relative"
         suf_to_c_items = list(suffix_to_compiler.items())
         suf_to_c_items.sort(key=lambda x: x[0])
         for suffix, compiler in suf_to_c_items:
@@ -660,20 +666,28 @@ class BaseWritter(Writer):
                             p: Path,
                             name_pool: UniqueNamePool,
                             suffix: str = ".o"):
-        source_out_parent = self._build_dir
-        if self.out_root is not None:
-            out_root = self.out_root
-            try:
-                relative = p.parent.relative_to(out_root)
-                source_out_parent = self._build_dir / relative
-            except ValueError:
-                source_out_parent = self._build_dir
+        if self.objects_folder is not None:
+            source_out_parent = self._build_dir / self.objects_folder
+        else:
+            source_out_parent = self._build_dir
+            if self.out_root is not None:
+                out_root = self.out_root
+                try:
+                    relative = p.parent.relative_to(out_root)
+                    source_out_parent = self._build_dir / relative
+                except ValueError:
+                    source_out_parent = self._build_dir
         source_out_parent.mkdir(exist_ok=True, parents=True, mode=0o755)
         obj_path_no_suffix = (source_out_parent / (p.name))
         obj_path_no_suffix = Path(name_pool(str(obj_path_no_suffix)))
         obj_path = obj_path_no_suffix.parent / (obj_path_no_suffix.name +
                                                 suffix)
         assert obj_path.parent.exists()
+
+        if self.objects_folder is not None:
+            # cwd is build_dir, so we just use relative path to avoid
+            # 'command too long' in windows.
+            return obj_path.relative_to(self._build_dir)
         return obj_path
 
     def _create_msvc_stub_path(self,
@@ -847,7 +861,8 @@ def create_simple_ninja(
         shared=False,
         pch_to_sources: Optional[Dict[Union[str, Path],
                                       List[Union[str, Path]]]] = None,
-        pch_to_include: Optional[Dict[Union[str, Path], str]] = None):
+        pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
+        objects_folder: Optional[Union[str, Path]] = None):
     default_suffix_to_compiler = _default_suffix_to_compiler()
     suffix_to_compiler_ = default_suffix_to_compiler
     if suffix_to_compiler is not None:
@@ -863,8 +878,14 @@ def create_simple_ninja(
             # add default suffix
             target_filename = str(path.parent /
                                   _default_target_filename(path.stem, shared))
-    writer = BaseWritter(suffix_to_compiler_, build_dir, build_options,
-                         link_options, OrderedDict(), OrderedDict(), out_root)
+    writer = BaseWritter(suffix_to_compiler_,
+                         build_dir,
+                         build_options,
+                         link_options,
+                         OrderedDict(),
+                         OrderedDict(),
+                         out_root,
+                         objects_folder=objects_folder)
     target_build_opt = BuildOptions(includes, compile_opts)
     target_build_options = OrderedDict()
     additional_cflags = fill_build_flags(additional_cflags)
@@ -900,11 +921,13 @@ def build_simple_ninja(
         shared=True,
         pch_to_sources: Optional[Dict[Union[str, Path],
                                       List[Union[str, Path]]]] = None,
-        pch_to_include: Optional[Dict[Union[str, Path], str]] = None):
+        pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
+        objects_folder: Optional[Union[str, Path]] = None):
     ninja_content, target_filename = create_simple_ninja(
         target, build_dir, sources, includes, libs, libpaths, compile_opts,
         link_opts, target_filename, additional_cflags, additional_lflags,
-        suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include)
+        suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include,
+        objects_folder)
     build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)
