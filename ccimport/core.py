@@ -63,7 +63,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              compile_options: Optional[List[str]] = None,
              link_options: Optional[List[str]] = None,
              source_paths_for_hash: Optional[List[Union[str, Path]]] = None,
-             std="c++14",
+             std: Optional[str] = "c++14",
              build_ctype=False,
              disable_hash=True,
              load_library=True,
@@ -131,10 +131,11 @@ def ccimport(source_paths: List[Union[str, Path]],
     if link_options is None:
         link_options = []
     fill_build_flags(additional_cflags)
-    additional_cflags["cl"].extend(["/std:{}".format(std), "/O2"])
-    additional_cflags["g++"].extend(["-std={}".format(std), "-O3"])
-    additional_cflags["clang++"].extend(["-std={}".format(std), "-O3"])
-    additional_cflags["nvcc"].extend(["-std={}".format(std), "-O3"])
+    if std is not None:
+        additional_cflags["cl"].extend(["/std:{}".format(std), "/O2"])
+        additional_cflags["g++"].extend(["-std={}".format(std), "-O3"])
+        additional_cflags["clang++"].extend(["-std={}".format(std), "-O3"])
+        additional_cflags["nvcc"].extend(["-std={}".format(std), "-O3"])
     if compat.InWindows:
         # in windows, we need to link against python library.
         if not build_ctype:
@@ -341,7 +342,7 @@ def autoimport(sources: List[Union[str, Path]],
                export_init_shared_kw="CODEAI_EXPORT_SHARED_INIT",
                compile_options: Optional[List[str]] = None,
                link_options: Optional[List[str]] = None,
-               std="c++14",
+               std: Optional[str] = "c++14",
                disable_hash=False,
                load_library=True,
                additional_cflags: Optional[Dict[str, List[str]]] = None,
