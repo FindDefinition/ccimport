@@ -21,13 +21,14 @@ LOCALE_TO_MSVC_DEP_PREFIX = {
 DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX["en"]
 
 _LOC = locale.getdefaultlocale()[0]
-if _LOC in LOCALE_TO_MSVC_DEP_PREFIX:
-    DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC]
-else:
-    _LOC_SPLIT = _LOC.split("_")
-    if _LOC_SPLIT[0] in LOCALE_TO_MSVC_DEP_PREFIX:
-        DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC_SPLIT[0]]
-
+if _LOC is not None:
+    if _LOC in LOCALE_TO_MSVC_DEP_PREFIX:
+        DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC]
+    else:
+        _LOC_SPLIT = _LOC.split("_")
+        if _LOC_SPLIT[0] in LOCALE_TO_MSVC_DEP_PREFIX:
+            DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC_SPLIT[0]]
+    
 ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++'])
 ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
 
