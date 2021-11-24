@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from ninja.ninja_syntax import Writer
 from ccimport import compat
-from ccimport.constants import get_compiler_map, CXX
+from ccimport.constants import get_compiler_map, CXX, CUDACXX, HIPCXX
 
 LOCALE_TO_MSVC_DEP_PREFIX = {
     "en": "Note: including file:",
@@ -31,6 +31,10 @@ if _LOC is not None:
     
 ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++'])
 ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
+
+ALL_SUPPORTED_CPU_COMPILER = set(['cl', 'g++', 'clang++'])
+ALL_SUPPORTED_CUDA_COMPILER = set(['nvcc'])
+ALL_SUPPORTED_HIP_COMPILER = set(['hipcc'])
 
 _ALL_OVERRIDE_FLAGS = (set(["/MT", "/MD", "/LD", "/MTd", "/MDd", "/LDd"]), )
 
@@ -196,9 +200,18 @@ class BaseWritter(Writer):
             # CXX only valid in linux
             if CXX is not None:
                 # if cxx available, we force all map to 
-                for compiler in ALL_SUPPORTED_COMPILER:
+                for compiler in ALL_SUPPORTED_CPU_COMPILER:
                     self.compiler_to_path[compiler] = CXX
                     self.linker_to_path[compiler] = CXX
+            if CUDACXX is not None:
+                for compiler in ALL_SUPPORTED_CUDA_COMPILER:
+                    self.compiler_to_path[compiler] = CUDACXX
+                    self.linker_to_path[compiler] = CUDACXX
+            if HIPCXX is not None:
+                for compiler in ALL_SUPPORTED_HIP_COMPILER:
+                    self.compiler_to_path[compiler] = HIPCXX
+                    self.linker_to_path[compiler] = HIPCXX
+
 
         self.objects_folder = None if objects_folder is None else Path(
             objects_folder)
