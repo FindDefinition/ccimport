@@ -15,6 +15,8 @@
 import os
 from typing import Dict 
 
+CXX = os.getenv("CXX", None)
+
 def get_compiler_map() -> Dict[str, str]:
     cmap = os.getenv("CCIMPORT_COMPILER_LINKER_MAP", None)
     if cmap is None:

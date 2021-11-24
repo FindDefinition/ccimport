@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from ninja.ninja_syntax import Writer
 from ccimport import compat
-from ccimport.constants import get_compiler_map
+from ccimport.constants import get_compiler_map, CXX, CC
 
 LOCALE_TO_MSVC_DEP_PREFIX = {
     "en": "Note: including file:",
@@ -192,6 +192,14 @@ class BaseWritter(Writer):
             self.linker_to_path = {}
         else:
             self.linker_to_path = linker_to_path
+        if compat.InLinux:
+            # CXX only valid in linux
+            if CXX is not None:
+                # if cxx available, we force all map to 
+                for compiler in ALL_SUPPORTED_COMPILER:
+                    self.compiler_to_path[compiler] = CXX
+                    self.linker_to_path[compiler] = CXX
+
         self.objects_folder = None if objects_folder is None else Path(
             objects_folder)
         if self.objects_folder is not None:
@@ -204,8 +212,8 @@ class BaseWritter(Writer):
             compiler = _filter_unsupported_compiler(compilers)[0]
             suffix_ = suffix.replace(".", "_")
             compiler_name = 'compiler_' + suffix_
-            if compiler in compiler_to_path:
-                self.variable(compiler_name, compiler_to_path[compiler])
+            if compiler in self.compiler_to_path:
+                self.variable(compiler_name, self.compiler_to_path[compiler])
             else:
                 self.variable(compiler_name, self.get_mapped_cc_ld(compiler))
 
