@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from ninja.ninja_syntax import Writer
-
 from ccimport import compat
+from ccimport.constants import get_compiler_map
 
 LOCALE_TO_MSVC_DEP_PREFIX = {
     "en": "Note: including file:",
@@ -183,7 +183,7 @@ class BaseWritter(Writer):
         self.compiler_link_opts = compiler_link_opts
         self._compiler_var_to_compiler = {}
         self._compiler_to_compiler_var = {}
-
+        self._compiler_linker_map = get_compiler_map()
         self.compiler_to_path = compiler_to_path
         self.linker_to_path = linker_to_path
         self.objects_folder = None if objects_folder is None else Path(
@@ -201,7 +201,7 @@ class BaseWritter(Writer):
             if compiler in compiler_to_path:
                 self.variable(compiler_name, compiler_to_path[compiler])
             else:
-                self.variable(compiler_name, compiler)
+                self.variable(compiler_name, self.get_mapped_cc_ld(compiler))
 
             self._suffix_to_compiler_var[suffix] = compiler_name
             self._compiler_var_to_compiler[compiler_name] = compiler
@@ -214,6 +214,11 @@ class BaseWritter(Writer):
     @property
     def content(self) -> str:
         return self._sstream.getvalue()
+
+    def get_mapped_cc_ld(self, name: str):
+        if name in self._compiler_linker_map:
+            return self._compiler_linker_map[name]
+        return name 
 
     def gcc_build_setup(self,
                         name,
@@ -404,23 +409,23 @@ class BaseWritter(Writer):
             # ++ can't be used in name
             link_name = "gplusplus_{}".format(target_name)
             self.variable(link_name,
-                          'g++' if linker_path is None else linker_path)
+                          self.get_mapped_cc_ld("g++") if linker_path is None else linker_path)
             return self.gcc_link_setup(target_name, linker, link_name,
                                        link_opts)
         elif linker == "clang++":
             link_name = "clang_{}".format(target_name)
             self.variable(link_name,
-                          "clang++" if linker_path is None else linker_path)
+                          self.get_mapped_cc_ld("clang++") if linker_path is None else linker_path)
             return self.gcc_link_setup(target_name, linker, link_name,
                                        link_opts)
         elif linker == "cl":
             self.variable(link_name,
-                          "link" if linker_path is None else linker_path)
+                          self.get_mapped_cc_ld("link") if linker_path is None else linker_path)
             return self.msvc_link_setup(target_name, linker, link_name,
                                         link_opts)
         elif linker == "nvcc":
             self.variable(link_name,
-                          "nvcc" if linker_path is None else linker_path)
+                          self.get_mapped_cc_ld("nvcc") if linker_path is None else linker_path)
             return self.nvcc_link_setup(target_name, linker, link_name,
                                         link_opts)
         else:

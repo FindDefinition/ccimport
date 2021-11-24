@@ -5,6 +5,7 @@ import subprocess
 import sys
 import sysconfig
 from enum import Enum
+from typing import Tuple
 
 Python3 = (sys.version_info[0] == 3)
 Python4 = (sys.version_info[0] == 4)
@@ -61,11 +62,22 @@ def get_python_version():
 
 
 def get_extension_suffix():
+    setuptools_ext = os.getenv("SETUPTOOLS_EXT_SUFFIX", None)
+    if setuptools_ext is not None:
+        return setuptools_ext
     ext_suffix = sysconfig.get_config_var('EXT_SUFFIX')
     if ext_suffix is None:
         ext_suffix = sysconfig.get_config_var('SO')
     assert ext_suffix is not None
     return ext_suffix
+
+def get_extension_suffix_linux_custom(py_ver: Tuple[int, int], arch: str):
+    # arch can be x86_64 or aarch64
+    assert py_ver >= (3, 6)
+    if py_ver == (3, 6) or py_ver == (3, 7):
+        return f".cpython-{py_ver[0]}{py_ver[1]}m-{arch}-linux-gnu.so"
+    else:
+        return f".cpython-{py_ver[0]}{py_ver[1]}-{arch}-linux-gnu.so"
 
 
 def get_python_includes():
