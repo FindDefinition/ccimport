@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from ninja.ninja_syntax import Writer
 from ccimport import compat
-from ccimport.constants import get_compiler_map, CXX, CC
+from ccimport.constants import get_compiler_map, CXX
 
 LOCALE_TO_MSVC_DEP_PREFIX = {
     "en": "Note: including file:",
