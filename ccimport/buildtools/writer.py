@@ -161,8 +161,8 @@ class BaseWritter(Writer):
                  build_dir: Union[Path, str],
                  compiler_build_opts: Dict[str, BuildOptions],
                  compiler_link_opts: Dict[str, LinkOptions],
-                 compiler_to_path: Dict[str, str],
-                 linker_to_path: Dict[str, str],
+                 compiler_to_path: Optional[Dict[str, str]] = None,
+                 linker_to_path: Optional[Dict[str, str]] = None,
                  out_root: Optional[Union[Path, str]] = None,
                  msvc_stub_dir: str = "msvc_stub",
                  objects_folder: Optional[Union[str, Path]] = None,
@@ -184,8 +184,14 @@ class BaseWritter(Writer):
         self._compiler_var_to_compiler = {}
         self._compiler_to_compiler_var = {}
         self._compiler_linker_map = get_compiler_map()
-        self.compiler_to_path = compiler_to_path
-        self.linker_to_path = linker_to_path
+        if compiler_to_path is None:
+            self.compiler_to_path = {}
+        else:
+            self.compiler_to_path = compiler_to_path
+        if linker_to_path is None:
+            self.linker_to_path = {}
+        else:
+            self.linker_to_path = linker_to_path
         self.objects_folder = None if objects_folder is None else Path(
             objects_folder)
         if self.objects_folder is not None:
@@ -868,7 +874,9 @@ def create_simple_ninja(
         pch_to_sources: Optional[Dict[Union[str, Path],
                                       List[Union[str, Path]]]] = None,
         pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
-        objects_folder: Optional[Union[str, Path]] = None):
+        objects_folder: Optional[Union[str, Path]] = None,
+        compiler_to_path: Optional[Dict[str, str]] = None,
+        linker_to_path: Optional[Dict[str, str]] = None):
     default_suffix_to_compiler = _default_suffix_to_compiler()
     suffix_to_compiler_ = default_suffix_to_compiler
     if suffix_to_compiler is not None:
@@ -884,12 +892,13 @@ def create_simple_ninja(
             # add default suffix
             target_filename = str(path.parent /
                                   _default_target_filename(path.stem, shared))
+    
     writer = BaseWritter(suffix_to_compiler_,
                          build_dir,
                          build_options,
                          link_options,
-                         OrderedDict(),
-                         OrderedDict(),
+                         compiler_to_path,
+                         linker_to_path,
                          out_root,
                          objects_folder=objects_folder)
     target_build_opt = BuildOptions(includes, compile_opts)
@@ -928,12 +937,14 @@ def build_simple_ninja(
         pch_to_sources: Optional[Dict[Union[str, Path],
                                       List[Union[str, Path]]]] = None,
         pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
-        objects_folder: Optional[Union[str, Path]] = None):
+        objects_folder: Optional[Union[str, Path]] = None,
+        compiler_to_path: Optional[Dict[str, str]] = None,
+        linker_to_path: Optional[Dict[str, str]] = None):
     ninja_content, target_filename = create_simple_ninja(
         target, build_dir, sources, includes, libs, libpaths, compile_opts,
         link_opts, target_filename, additional_cflags, additional_lflags,
         suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include,
-        objects_folder)
+        objects_folder, compiler_to_path, linker_to_path)
     build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)

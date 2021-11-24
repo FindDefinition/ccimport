@@ -43,7 +43,6 @@ def _test_gcc_crosscompile_build():
     with tempdir() as tempd:
         py_ver = (sys.version_info[0], sys.version_info[1])
         os.environ["SETUPTOOLS_EXT_SUFFIX"] = compat.get_extension_suffix_linux_custom(py_ver, "aarch64")
-        os.environ["CCIMPORT_COMPILER_LINKER_MAP"] = "g++:aarch64-linux-gnu-g++"
 
         sources = [
             Path(__file__).parent / "executable.cc",
@@ -58,8 +57,10 @@ def _test_gcc_crosscompile_build():
                                    load_library=False,
                                    pch_to_sources=p2s,
                                    pch_to_include=pch_to_include,
-                                   verbose=False,
-                                   objects_folder="objects")
+                                   verbose=True,
+                                   objects_folder="objects",
+                                   compiler_to_path={"g++": "aarch64-linux-gnu-g++"},
+                                   linker_to_path={"g++": "aarch64-linux-gnu-g++"})
         print(input("hold"), tempd)
 
         output = subprocess.check_output([str(source)])

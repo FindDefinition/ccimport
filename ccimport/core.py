@@ -78,6 +78,8 @@ def ccimport(source_paths: List[Union[str, Path]],
              pch_to_include: Optional[Dict[Union[str, Path], str]] = None,
              suffix_to_compiler: Optional[Dict[str, List[str]]] = None,
              objects_folder: Optional[Union[str, Path]] = None,
+             compiler_to_path: Optional[Dict[str, str]] = None,
+             linker_to_path: Optional[Dict[str, str]] = None,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -175,7 +177,9 @@ def ccimport(source_paths: List[Union[str, Path]],
             verbose=verbose,
             pch_to_sources=pch_to_sources,
             pch_to_include=pch_to_include,
-            objects_folder=objects_folder)
+            objects_folder=objects_folder,
+            compiler_to_path=compiler_to_path,
+            linker_to_path=linker_to_path)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename
@@ -346,6 +350,8 @@ def autoimport(sources: List[Union[str, Path]],
                disable_hash=False,
                load_library=True,
                additional_cflags: Optional[Dict[str, List[str]]] = None,
+               compiler_to_path: Optional[Dict[str, str]] = None,
+               linker_to_path: Optional[Dict[str, str]] = None,
                verbose=False):
     sources = list(map(lambda p: Path(p).resolve(), sources))
     if includes is None:
@@ -402,5 +408,7 @@ def autoimport(sources: List[Union[str, Path]],
                        disable_hash=disable_hash,
                        load_library=load_library,
                        additional_cflags=additional_cflags,
-                       verbose=verbose)
+                       verbose=verbose,
+                       compiler_to_path=compiler_to_path,
+                       linker_to_path=linker_to_path)
         return mod
