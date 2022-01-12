@@ -105,7 +105,7 @@ class FunctionDef:
 class CppSourceIterator(object):
     # TODO try to handle '<' and '>'
     # TODO use regex to write a c++ tokenize library
-    AllSymbols = set([";", ":", "<", ">", "{", "}", "[", "]", "(", ")", "|"])
+    AllSymbols = set([";", ":", "<", ">", "{", "}", "[", "]", "(", ")", "|", "$"])
 
     def __init__(self, source):
         # if len(source) == 0:
@@ -161,6 +161,9 @@ class CppSourceIterator(object):
         self._namespace_ranges.sort(key=lambda x: x[1])
 
         self.local_id_to_cdef = self._update_class_def_namespace()
+
+    def get_symbol_poses(self, sym: str):
+        return self._symbol_to_poses[sym]
 
     def find_symbols_in_range(self, sym, start, end=None):
         if sym not in self._symbol_to_poses:
@@ -515,11 +518,11 @@ if __name__ == "__main__":
     source = """
     std::cout << L"hello" << " world";
     std::cout << "He said: \"bananas\"" << "...";
-    std::cout << ("");
+    std::cout << ("") << $b;
     std::cout << "\x12\23\x34";
     "" // empty string
     '"' // character literal
-
+    $a[5] = 3;
     // this is "a string literal" in a comment
     /* this is
     "also inside"
@@ -532,3 +535,10 @@ if __name__ == "__main__":
     """
     it = CppSourceIterator(source)
     print(it.bracket_pairs)
+
+    
+    for pose in it.get_symbol_poses("$"):
+        it.move(pose + 1)
+        iden = it.next_identifier()
+        assert iden is not None, "you can't use $ without a identifier."
+        print(iden.name)
