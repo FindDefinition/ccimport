@@ -771,8 +771,9 @@ def _default_suffix_to_compiler():
 
 
 COMMON_NVCC_FLAGS = [
-    '-D__CUDA_NO_HALF_OPERATORS__', '-D__CUDA_NO_HALF_CONVERSIONS__',
-    '-D__CUDA_NO_HALF2_OPERATORS__', '--expt-relaxed-constexpr',
+    # '-D__CUDA_NO_HALF_OPERATORS__', '-D__CUDA_NO_HALF_CONVERSIONS__',
+    # '-D__CUDA_NO_HALF2_OPERATORS__', 
+    '--expt-relaxed-constexpr',
     '-Xcompiler=\"-fPIC\"', '-Xcompiler=\'-O3\''
 ]
 
