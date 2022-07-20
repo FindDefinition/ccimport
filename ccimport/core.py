@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Union
 import pybind11
 
 from ccimport import compat, loader
+from ccimport.buildmeta import BuildMeta
 from ccimport.buildtools.writer import (DEFAULT_MSVC_DEP_PREFIX,
                                         build_simple_ninja, fill_build_flags)
 from ccimport.global_cfg import GLOBAL_CONFIG
@@ -57,18 +58,12 @@ def get_full_file_name(name, build_ctype, shared=True):
 
 def ccimport(source_paths: List[Union[str, Path]],
              out_path: Union[str, Path],
-             includes: Optional[List[Union[str, Path]]] = None,
-             libpaths: Optional[List[Union[str, Path]]] = None,
-             libraries: Optional[List[str]] = None,
-             compile_options: Optional[List[str]] = None,
-             link_options: Optional[List[str]] = None,
+             build_meta: BuildMeta,
              source_paths_for_hash: Optional[List[Union[str, Path]]] = None,
              std: Optional[str] = "c++14",
              build_ctype=False,
              disable_hash=True,
              load_library=True,
-             additional_cflags: Optional[Dict[str, List[str]]] = None,
-             additional_lflags: Optional[Dict[str, List[str]]] = None,
              shared=True,
              msvc_deps_prefix=DEFAULT_MSVC_DEP_PREFIX,
              out_root: Optional[Union[str, Path]] = None,
@@ -80,6 +75,7 @@ def ccimport(source_paths: List[Union[str, Path]],
              objects_folder: Optional[Union[str, Path]] = None,
              compiler_to_path: Optional[Dict[str, str]] = None,
              linker_to_path: Optional[Dict[str, str]] = None,
+             source_meta: Optional[Dict[str, BuildMeta]] = None,
              verbose=False):
     if not shared:
         assert load_library is False, "executable can't be loaded to python"
@@ -120,24 +116,9 @@ def ccimport(source_paths: List[Union[str, Path]],
                     return loader.try_import_from_path(extension_path)
                 return extension_path
     lib_name = out_path.stem
-    if includes is None:
-        includes = []
-    if libpaths is None:
-        libpaths = []
-    if libraries is None:
-        libraries = []
-    if compile_options is None:
-        compile_options = []
-    if additional_cflags is None:
-        additional_cflags = {}
-    if link_options is None:
-        link_options = []
-    fill_build_flags(additional_cflags)
     if std is not None:
-        additional_cflags["cl"].extend(["/std:{}".format(std), "/O2"])
-        additional_cflags["g++"].extend(["-std={}".format(std), "-O3"])
-        additional_cflags["clang++"].extend(["-std={}".format(std), "-O3"])
-        additional_cflags["nvcc"].extend(["-std={}".format(std), "-O3"])
+        build_meta.add_global_cflags("cl", "/std:{}".format(std), "/O2")
+        build_meta.add_global_cflags("g++,clang++,nvcc", "-std={}".format(std), "-O3")
     if compat.InWindows:
         # in windows, we need to link against python library.
         if not build_ctype:
@@ -145,11 +126,14 @@ def ccimport(source_paths: List[Union[str, Path]],
             pythonlib = compat.locate_libpython_2(py_version_str_p)
             assert isinstance(pythonlib, str)
             pythonlib = Path(pythonlib)
-            libraries.append(pythonlib.stem)
-            libpaths.append(pythonlib.parent)
+            build_meta.add_libraries(pythonlib.stem)
+            build_meta.add_library_paths(pythonlib.parent)
+            # libraries.append(pythonlib.stem)
+            # libpaths.append(pythonlib.parent)
     python_includes = compat.get_pybind11_includes()
-    includes.extend(python_includes)
-    includes.extend(GLOBAL_CONFIG.includes)
+    build_meta.add_global_includes(*python_includes, *GLOBAL_CONFIG.includes)
+    # includes.extend(python_includes)
+    # includes.extend(GLOBAL_CONFIG.includes)
     target_filename = get_full_file_name(lib_name, build_ctype, shared)
     if build_dir is not None:
         build_dir = Path(build_dir)
@@ -158,19 +142,16 @@ def ccimport(source_paths: List[Union[str, Path]],
     build_dir.mkdir(exist_ok=True, parents=True, mode=0o755)
     if "CCIMPORT_MSVC_DEPS_PREFIX" not in os.environ:
         os.environ["CCIMPORT_MSVC_DEPS_PREFIX"] = msvc_deps_prefix
+    # print(build_meta.libraries)
+    # breakpoint()
+
     try:
         target_filename, no_work = build_simple_ninja(
             lib_name,
             build_dir,
             source_paths,
-            includes,
-            libraries,
-            libpaths,
-            compile_options,
-            link_options,
+            build_meta,
             target_filename,
-            additional_cflags,
-            additional_lflags,
             out_root=out_root,
             suffix_to_compiler=suffix_to_compiler,
             shared=shared,
@@ -179,7 +160,8 @@ def ccimport(source_paths: List[Union[str, Path]],
             pch_to_include=pch_to_include,
             objects_folder=objects_folder,
             compiler_to_path=compiler_to_path,
-            linker_to_path=linker_to_path)
+            linker_to_path=linker_to_path,
+            source_meta=source_meta)
     finally:
         os.environ.pop("CCIMPORT_MSVC_DEPS_PREFIX")
     build_out_path = build_dir / target_filename
@@ -208,207 +190,3 @@ def ccimport(source_paths: List[Union[str, Path]],
             return ctypes.cdll.LoadLibrary(extension_path)
         return loader.try_import_from_path(extension_path)
     return extension_path
-
-
-def _parse_sources_get_pybind(lib_name, source_paths, source_contents,
-                              export_kw, export_init_kw, export_init_shared_kw,
-                              export_prop_kw):
-    classes = {}
-    outside_methods = []
-    path_has_export = []
-    for path in source_paths:
-        path = Path(path)
-        source = source_contents[str(path)]
-        siter = CppSourceIterator(source)
-        all_func_defs = siter.find_function_prefix(export_kw,
-                                                   True,
-                                                   True,
-                                                   decl_only=True)
-        all_cls_init_defs = siter.find_function_prefix(export_init_kw,
-                                                       True,
-                                                       True,
-                                                       decl_only=True)
-        all_cls_init_defs = [(d, False) for d in all_cls_init_defs]
-        all_cls_shared_init_defs = siter.find_function_prefix(
-            export_init_shared_kw, True, True, decl_only=True)
-        all_cls_shared_init_defs = [(d, True)
-                                    for d in all_cls_shared_init_defs]
-        all_cls_init_defs += all_cls_shared_init_defs
-        all_marked_props = siter.find_marked_identifier(export_prop_kw)
-        if all_func_defs or all_cls_init_defs:
-            path_has_export.append(path)
-        for init_def, is_shared in all_cls_init_defs:
-            func_id = init_def.local_id
-            parts = func_id.split("::")
-            ns_func_id = "::".join(parts[:-1])
-
-            assert ns_func_id in siter.local_id_to_cdef, "init must inside a class"
-            cdef = siter.local_id_to_cdef[ns_func_id]
-            cls_local_id = cdef.local_id
-            if cdef.is_template:
-                cls_local_id += "<>"
-            if cls_local_id not in classes:
-                classes[cls_local_id] = {
-                    "inits": [],
-                    "methods": [],
-                    "public_props": [],
-                    "is_template": cdef.is_template,
-                    "is_shared": is_shared,
-                }
-            func_name = func_id.split("::")[-1]
-            classes[cls_local_id]["inits"].append(cls_local_id + "::" +
-                                                  func_name)
-        for func_def in all_func_defs:
-            func_id = func_def.local_id
-            is_template = func_def.is_template
-
-            parts = func_id.split("::")
-            if len(parts) == 1:
-                outside_methods.append((func_id, is_template))
-                continue
-            ns_func_id = "::".join(parts[:-1])
-            if ns_func_id not in siter.local_id_to_cdef:
-                outside_methods.append((func_id, is_template))
-                continue
-            cdef = siter.local_id_to_cdef[ns_func_id]
-            cls_local_id = cdef.local_id
-            if cdef.is_template:
-                cls_local_id += "<>"
-            assert cls_local_id in classes
-            func_name = func_id.split("::")[-1]
-            classes[cls_local_id]["methods"].append(cls_local_id + "::" +
-                                                    func_name)
-        for name, ns in all_marked_props:
-            if ns not in siter.local_id_to_cdef:
-                print("ignore invalid prop", name, ns)
-                continue
-            cdef = siter.local_id_to_cdef[ns]
-            cls_local_id = cdef.local_id
-            if cdef.is_template:
-                cls_local_id += "<>"
-            assert cls_local_id in classes
-            classes[cls_local_id]["public_props"].append(name)
-
-        for v in classes.values():
-            assert len(
-                v["inits"]
-            ) > 0, "your exported class must have at least one constructor"
-
-    py_module_code_lines = [
-        "PYBIND11_MODULE({}, m){{".format(lib_name),
-        "  namespace py = pybind11;",
-    ]
-    for k, v in classes.items():
-        is_shared = v["is_shared"]
-        if is_shared:
-            class_lines = [
-                "  py::class_<{}, std::shared_ptr<{}>>(m, \"{}\")".format(
-                    k, k,
-                    k.replace("::", "_").replace("<>", "")),
-            ]
-        else:
-            class_lines = [
-                "  py::class_<{}>(m, \"{}\")".format(
-                    k,
-                    k.replace("::", "_").replace("<>", "")),
-            ]
-        for init in v["inits"]:
-            class_lines.append("    .def(py::init(&{}))".format(init))
-        for method in v["methods"]:
-            method_name = method.split("::")[-1]
-            class_lines.append("    .def(\"{}\", &{})".format(
-                method_name, method))
-        for prop in v["public_props"]:  # .def_readwrite("name", &Pet::name);
-            class_lines.append("    .def_readwrite(\"{}\", &{}::{})".format(
-                prop, k, prop))
-
-        class_lines[-1] += ";"
-        py_module_code_lines.extend(class_lines)
-    for k, is_template in outside_methods:
-        if is_template:
-            py_module_code_lines.append("  m.def(\"{}\", &{});".format(
-                k.replace("::", "_"), k + "<>"))
-        else:
-            py_module_code_lines.append("  m.def(\"{}\", &{});".format(
-                k.replace("::", "_"), k))
-    py_module_code_lines += ["}"]
-    return py_module_code_lines, path_has_export
-
-
-def autoimport(sources: List[Union[str, Path]],
-               out_path: Union[str, Path],
-               includes: Optional[List[Union[str, Path]]] = None,
-               libpaths: Optional[List[Union[str, Path]]] = None,
-               libraries: Optional[List[str]] = None,
-               export_kw="CODEAI_EXPORT",
-               export_init_kw="CODEAI_EXPORT_INIT",
-               export_prop_kw="CODEAI_EXPORT_PROP",
-               export_init_shared_kw="CODEAI_EXPORT_SHARED_INIT",
-               compile_options: Optional[List[str]] = None,
-               link_options: Optional[List[str]] = None,
-               std: Optional[str] = "c++14",
-               disable_hash=False,
-               load_library=True,
-               additional_cflags: Optional[Dict[str, List[str]]] = None,
-               compiler_to_path: Optional[Dict[str, str]] = None,
-               linker_to_path: Optional[Dict[str, str]] = None,
-               verbose=False):
-    sources = list(map(lambda p: Path(p).resolve(), sources))
-    if includes is None:
-        includes = []
-    if libpaths is None:
-        libpaths = []
-    if libraries is None:
-        libraries = []
-    if additional_cflags is None:
-        additional_cflags = {}
-    if link_options is None:
-        link_options = []
-    fill_build_flags(additional_cflags)
-    for define in [
-            export_kw, export_init_kw, export_prop_kw, export_init_shared_kw
-    ]:
-        additional_cflags["cl"].append("/D{}=".format(define))
-        additional_cflags["g++"].append("-D{}=".format(define))
-        additional_cflags["clang++"].append("-D{}=".format(define))
-        additional_cflags["nvcc"].append("-D{}=".format(define))
-    source_contents = {}
-    for path in sources:
-        path = Path(path)
-        with path.open("r") as f:
-            source_contents[str(path)] = f.read()
-
-    out_path = Path(out_path)
-    lib_name = out_path.stem
-    py_module_code_lines, path_has_export = _parse_sources_get_pybind(
-        lib_name, sources, source_contents, export_kw, export_init_kw,
-        export_init_shared_kw, export_prop_kw)
-    final_source_lines = _PYBIND_COMMON_INCLUDES.copy()
-    final_impl_sources = []
-    for s in sources:
-        if Path(s) in path_has_export:
-            final_source_lines.append("#include \"{}\"".format(s))
-        else:
-            final_impl_sources.append(s)
-    final_source_lines.extend(py_module_code_lines)
-    with tempdir() as dirpath:
-        path_to_write = Path(dirpath).resolve() / "main.cc"
-        with path_to_write.open("w") as f:
-            f.write("\n".join(final_source_lines))
-
-        mod = ccimport([str(path_to_write), *final_impl_sources],
-                       out_path,
-                       includes,
-                       libpaths,
-                       libraries,
-                       compile_options,
-                       link_options,
-                       std=std,
-                       source_paths_for_hash=sources,
-                       disable_hash=disable_hash,
-                       load_library=load_library,
-                       additional_cflags=additional_cflags,
-                       verbose=verbose,
-                       compiler_to_path=compiler_to_path,
-                       linker_to_path=linker_to_path)
-        return mod
