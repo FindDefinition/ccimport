@@ -960,8 +960,10 @@ def build_simple_ninja(
         suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include,
         objects_folder, compiler_to_path, linker_to_path, source_meta)
     build_dir = Path(build_dir).resolve()
-    with (build_dir / "build.ninja").open("r") as f:
-        content = f.read()
+    content = ""
+    if (build_dir / "build.ninja").exists():
+        with (build_dir / "build.ninja").open("r") as f:
+            content = f.read()
     if content != ninja_content:
         with (build_dir / "build.ninja").open("w") as f:
             f.write(ninja_content)
@@ -1013,8 +1015,10 @@ def run_simple_ninja(target,
         shared=False,
         source_meta=source_meta)
     build_dir = Path(build_dir)
-    with (build_dir / "build.ninja").open("r") as f:
-        content = f.read()
+    content = ""
+    if (build_dir / "build.ninja").exists():
+        with (build_dir / "build.ninja").open("r") as f:
+            content = f.read()
     if content != ninja_content:
         with (build_dir / "build.ninja").open("w") as f:
             f.write(ninja_content)
