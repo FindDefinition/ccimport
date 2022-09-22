@@ -1065,8 +1065,13 @@ def build_simple_ninja(
         suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include,
         objects_folder, compiler_to_path, linker_to_path, source_meta, linker)
     build_dir = Path(build_dir).resolve()
-    with (build_dir / "build.ninja").open("w") as f:
-        f.write(ninja_content)
+    content = ""
+    if (build_dir / "build.ninja").exists():
+        with (build_dir / "build.ninja").open("r") as f:
+            content = f.read()
+    if content != ninja_content:
+        with (build_dir / "build.ninja").open("w") as f:
+            f.write(ninja_content)
     # TODO: check_call don't raise, this is a problem
     cmds = ["ninja"]
     if verbose:
@@ -1115,8 +1120,13 @@ def run_simple_ninja(target,
         shared=False,
         source_meta=source_meta)
     build_dir = Path(build_dir)
-    with (build_dir / "build.ninja").open("w") as f:
-        f.write(ninja_content)
+    content = ""
+    if (build_dir / "build.ninja").exists():
+        with (build_dir / "build.ninja").open("r") as f:
+            content = f.read()
+    if content != ninja_content:
+        with (build_dir / "build.ninja").open("w") as f:
+            f.write(ninja_content)
     # TODO: check_call don't raise, this is a problem
     subprocess.check_call(["ninja", "-v"], cwd=str(build_dir))
     subprocess.check_call([str(build_dir / target_filename)],
