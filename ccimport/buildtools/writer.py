@@ -30,10 +30,10 @@ if _LOC is not None:
         if _LOC_SPLIT[0] in LOCALE_TO_MSVC_DEP_PREFIX:
             DEFAULT_MSVC_DEP_PREFIX = LOCALE_TO_MSVC_DEP_PREFIX[_LOC_SPLIT[0]]
 
-ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++'])
-ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++'])
+ALL_SUPPORTED_COMPILER = set(['cl', 'nvcc', 'g++', 'clang++', "em++"])
+ALL_SUPPORTED_LINKER = set(['cl', 'nvcc', 'g++', 'clang++', "em++"])
 
-ALL_SUPPORTED_CPU_COMPILER = set(['cl', 'g++', 'clang++'])
+ALL_SUPPORTED_CPU_COMPILER = set(['cl', 'g++', 'clang++', "em++"])
 ALL_SUPPORTED_CUDA_COMPILER = set(['nvcc'])
 ALL_SUPPORTED_HIP_COMPILER = set(['hipcc'])
 
@@ -86,9 +86,9 @@ def _list_none(val):
 
 
 _ALL_COMPILER_PLATFORM = {
-    "Linux": set(["g++", 'clang++', 'nvcc', 'hipcc']),
-    "Darwin": set(["clang++"]),
-    "Windows": set(["cl", 'clang++', 'nvcc', 'hipcc']),
+    "Linux": set(["g++", 'clang++', 'nvcc', 'hipcc', "em++"]),
+    "Darwin": set(["clang++", "em++"]),
+    "Windows": set(["cl", 'clang++', 'nvcc', 'hipcc', "em++"]),
 }
 
 
@@ -252,6 +252,46 @@ class BaseWritter(Writer):
         self.newline()
         return rule_name
 
+    def emcc_build_setup(self,
+                        name,
+                        compiler,
+                        compiler_var,
+                        meta: BuildMeta,
+                        pch: bool = False,
+                        use_pch: bool = False):
+        global_meta = self.global_build_meta
+        meta = global_meta + meta
+        includes = _get_include_flags_by_compiler(compiler,
+                                                  meta.get_global_includes())
+        cflags = meta.get_global_cflags().get(compiler, [])
+        assert not pch, "emcc don't support pch"
+        if pch:
+            cflags.append("-x")
+            cflags.append("c++-header")
+
+        cflags = " ".join(cflags)
+
+        rule_name = name + "_cxx_{}".format(compiler_var)
+        desc = "[EMCC][c++]$out"
+        if pch:
+            rule_name += "_pch"
+            desc = "[EMCC][c++/pch]$out"
+        if use_pch:
+            rule_name += "_with_pch"
+        compile_stmt = "${} -MMD -MT $out -MF $out.d {} $includes {} $cflags -c $in -o $out"
+        if use_pch:
+            compile_stmt = "${} -MMD -MT $out -MF $out.d {} $includes {} $cflags -include $pch -c $in -o $out"
+        # if pch:
+        #     compile_stmt = "${} {} {} -c $in -o $out {}"
+        self.rule(rule_name,
+                  compile_stmt.format(compiler_var, includes, cflags),
+                  description=desc,
+                  depfile="$out.d",
+                  deps="gcc")
+
+        self.newline()
+        return rule_name
+
     def gcc_link_setup(self, name, linker, linker_name, meta: BuildMeta, rspfile: str = ""):
         global_meta = self.global_build_meta
         meta = global_meta + meta
@@ -277,6 +317,46 @@ class BaseWritter(Writer):
             ["-L \"{}\"".format(str(l)) for l in meta.libpaths])
         rule_name = name + "_ld_{}".format(linker_name)
         desc = "[GCC][Link]$out"
+        if rspfile != "":
+            self.rule(rule_name,
+                    f"${linker_name} @${rspfile} {libs_str} {libpaths_str} {ldflags} -o $out",
+                    description=desc,
+                    rspfile=f"${rspfile}",
+                    rspfile_content="$in")
+        else:
+            self.rule(rule_name,
+                    "${} $in {} {} {} -o $out".format(linker_name, libs_str,
+                                                        libpaths_str, ldflags),
+                    description=desc)
+
+        self.newline()
+        return rule_name
+
+    def emcc_link_setup(self, name, linker, linker_name, meta: BuildMeta, rspfile: str = ""):
+        global_meta = self.global_build_meta
+        meta = global_meta + meta
+        ldflags = " ".join(meta.compiler_to_ldflags.get(linker, []))
+        libs = meta.libraries
+        lib_flags = []
+        for l in libs:
+            splits = l.split("::")
+            lib_flag = "-l" + str(splits[-1])
+            if len(splits) == 2:
+                prefix = splits[0]
+                if prefix == "file":
+                    lib_flag = "-l:" + splits[-1]
+                elif prefix == "raw":
+                    lib_flag = splits[-1]
+                else:
+                    raise NotImplementedError(
+                        "unsupported lib prefix. supported: file/raw::your_flag"
+                    )
+            lib_flags.append(lib_flag)
+        libs_str = " ".join(lib_flags)
+        libpaths_str = " ".join(
+            ["-L \"{}\"".format(str(l)) for l in meta.libpaths])
+        rule_name = name + "_ld_{}".format(linker_name)
+        desc = "[EMCC][Link]$out"
         if rspfile != "":
             self.rule(rule_name,
                     f"${linker_name} @${rspfile} {libs_str} {libpaths_str} {ldflags} -o $out",
@@ -416,6 +496,15 @@ class BaseWritter(Writer):
                 self.get_mapped_cc_ld("g++")
                 if linker_path is None else linker_path)
             return self.gcc_link_setup(target_name, linker, link_name, meta, rspfile)
+        if linker == "em++":
+            # ++ can't be used in name
+            link_name = "emplusplus_{}".format(target_name)
+            self.variable(
+                link_name,
+                self.get_mapped_cc_ld("em++")
+                if linker_path is None else linker_path)
+            return self.emcc_link_setup(target_name, linker, link_name, meta, rspfile)
+
         elif linker == "clang++":
             link_name = "clang_{}".format(target_name)
             self.variable(
@@ -449,6 +538,11 @@ class BaseWritter(Writer):
             # self.variable(compiler_name, "g++")
             return self.gcc_build_setup(target_name, compiler, compiler_name,
                                         meta, pch, use_pch)
+        elif compiler == "em++" or compiler == "emcc":
+            # self.variable(compiler_name, "cl")
+            return self.emcc_build_setup(target_name, compiler, compiler_name,
+                                         meta, pch, use_pch)
+                                        
         elif compiler == "cl":
             # self.variable(compiler_name, "cl")
             return self.msvc_build_setup(target_name, compiler, compiler_name,
@@ -643,14 +737,19 @@ class BaseWritter(Writer):
         build_meta = build_meta.copy()
         linker_flags = build_meta.compiler_to_ldflags.get(linker, [])
         if shared:
-            if not compat.InWindows:
-                build_meta.add_ldflags(linker, "-shared")
+            if linker not in ["emcc", "em++"]:
+                if not compat.InWindows:
+                    build_meta.add_ldflags(linker, "-shared")
+                    linker_flags.append("-shared")
+                else:
 
-                linker_flags.append("-shared")
-            else:
-                build_meta.add_ldflags(linker, "/dll")
+                    build_meta.add_ldflags(linker, "/dll")
 
-                linker_flags.append("/dll")
+                    linker_flags.append("/dll")
+            # else:
+                # build_meta.add_ldflags(linker, "-sSIDE_MODULE")
+                # linker_flags.append("-sSIDE_MODULE")
+
         if (Path(target_filename).is_absolute()):
             target_path = Path(target_filename)
         else:
@@ -833,6 +932,8 @@ def default_build_meta():
     meta.add_cflags("nvcc", *nvcc_flags)
     meta.add_cflags("clang++", "-fPIC")
     meta.add_cflags("g++", "-fPIC")
+    # TODO em++ need fPIC?
+    meta.add_cflags("em++", "-fPIC")
     return meta
 
 
@@ -844,6 +945,7 @@ def _default_linker():
 
 
 def _default_target_filename(target, shared=True):
+    # if Path(target).suffix
     if shared:
         if compat.InWindows:
             return target + ".dll"
@@ -910,12 +1012,14 @@ def create_simple_ninja(
         objects_folder: Optional[Union[str, Path]] = None,
         compiler_to_path: Optional[Dict[str, str]] = None,
         linker_to_path: Optional[Dict[str, str]] = None,
-        source_meta: Optional[Dict[str, BuildMeta]] = None):
+        source_meta: Optional[Dict[str, BuildMeta]] = None,
+        linker: Optional[str] = None):
     default_suffix_to_compiler = _default_suffix_to_compiler()
     suffix_to_compiler_ = default_suffix_to_compiler
     if suffix_to_compiler is not None:
         suffix_to_compiler_.update(suffix_to_compiler)
-    linker = _default_linker()
+    if linker is None:
+        linker = _default_linker()
     build_meta = build_meta + default_build_meta()
     if target_filename is None:
         target_filename = _default_target_filename(target, shared)
@@ -954,11 +1058,12 @@ def build_simple_ninja(
         objects_folder: Optional[Union[str, Path]] = None,
         compiler_to_path: Optional[Dict[str, str]] = None,
         linker_to_path: Optional[Dict[str, str]] = None,
-        source_meta: Optional[Dict[str, BuildMeta]] = None):
+        source_meta: Optional[Dict[str, BuildMeta]] = None,
+        linker: Optional[str] = None):
     ninja_content, target_filename = create_simple_ninja(
         target, build_dir, sources, build_meta, target_filename,
         suffix_to_compiler, out_root, shared, pch_to_sources, pch_to_include,
-        objects_folder, compiler_to_path, linker_to_path, source_meta)
+        objects_folder, compiler_to_path, linker_to_path, source_meta, linker)
     build_dir = Path(build_dir).resolve()
     with (build_dir / "build.ninja").open("w") as f:
         f.write(ninja_content)

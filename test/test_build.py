@@ -23,9 +23,11 @@ def test_cpp_exec_build():
         ]
         p2s = {Path(__file__).parent / "some_pch.h": sources}
         pch_to_include = {Path(__file__).parent / "some_pch.h": "some_pch.h"}
+        build_meta = ccimport.BuildMeta(includes=[Path(__file__).parent])
+
         source = ccimport.ccimport(sources,
                                    tempd / "executable",
-                                   includes=[Path(__file__).parent],
+                                   build_meta,
                                    shared=False,
                                    load_library=False,
                                    pch_to_sources=p2s,
@@ -51,9 +53,11 @@ def _test_gcc_crosscompile_build():
         ]
         p2s = {Path(__file__).parent / "some_pch.h": sources}
         pch_to_include = {Path(__file__).parent / "some_pch.h": "some_pch.h"}
+        build_meta = ccimport.BuildMeta(includes=[Path(__file__).parent])
+
         source = ccimport.ccimport(sources,
                                    tempd / "executable",
-                                   includes=[Path(__file__).parent],
+                                   build_meta,
                                    shared=True,
                                    load_library=False,
                                    pch_to_sources=p2s,
