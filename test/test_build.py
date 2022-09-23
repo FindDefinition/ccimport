@@ -25,8 +25,7 @@ def test_cpp_exec_build():
                                    load_library=False,
                                    pch_to_sources=p2s,
                                    pch_to_include=pch_to_include,
-                                   verbose=False,
-                                   objects_folder="objects")
+                                   verbose=False)
 
         output = subprocess.check_output([str(source)])
         assert output.decode("utf-8").strip() == "hello ccimport!"
@@ -55,8 +54,7 @@ def _test_gcc_crosscompile_build():
                                    load_library=False,
                                    pch_to_sources=p2s,
                                    pch_to_include=pch_to_include,
-                                   verbose=True,
-                                   objects_folder="objects")
+                                   verbose=True)
         print(input("hold"), tempd)
 
         output = subprocess.check_output([str(source)])

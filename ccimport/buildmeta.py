@@ -144,13 +144,13 @@ class BuildMeta(object):
         # self.compiler_to_cflags = group_dict_by_split(compiler_to_cflags)
         self.compiler_to_ldflags = group_dict_by_split(compiler_to_ldflags)
         if cflags_node is None:
-            cflags_node = CFlagsNode({}, {}, {})
+            cflags_node = CFlagsNode({}, {}, group_dict_by_split(compiler_to_cflags))
         else:
             cflags_node = _merge_type_to_cflags(
                 CFlagsNode({}, {}, group_dict_by_split(compiler_to_cflags)),
                 cflags_node)
         if include_node is None:
-            include_node = IncludesNode([], [], [])
+            include_node = IncludesNode([], [], includes)
         else:
             include_node = _merge_include_node(IncludesNode([], [], includes),
                                                include_node)
