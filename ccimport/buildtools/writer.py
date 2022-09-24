@@ -420,7 +420,7 @@ class BaseWritter(Writer):
                     f"{libs_str} {libpaths_str} {ldflags} /out:$out"),
                     description=desc,
                     rspfile=f"${rspfile}",
-                    rspfile_content="$in")
+                    rspfile_content="$in_newline")
         else:
             self.rule(rule_name,
                     "${} /link /nologo $in {} {} {} /out:$out".format(
