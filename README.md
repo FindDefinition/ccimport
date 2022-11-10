@@ -17,3 +17,7 @@ build_meta.add_ldflags(...)
 
 lib = ccimport([path1, path2], out_path, build_meta)
 ```
+
+## Usage in setup.py 
+
+see [example](example/setup)
