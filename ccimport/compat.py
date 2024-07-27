@@ -12,6 +12,11 @@ Python4 = (sys.version_info[0] == 4)
 Python3AndLater = (sys.version_info[0] >= 3)
 Python3Later = (sys.version_info[0] > 3)
 Python35 = Python3 and sys.version_info[1] == 5
+Python3_14AndLater = Python3Later or (Python3 and sys.version_info[1] >= 14)
+Python3_13AndLater = Python3Later or (Python3 and sys.version_info[1] >= 13)
+Python3_12AndLater = Python3Later or (Python3 and sys.version_info[1] >= 12)
+Python3_11AndLater = Python3Later or (Python3 and sys.version_info[1] >= 11)
+
 Python3_10AndLater = Python3Later or (Python3 and sys.version_info[1] >= 10)
 Python3_9AndLater = Python3Later or (Python3 and sys.version_info[1] >= 9)
 Python3_8AndLater = Python3Later or (Python3 and sys.version_info[1] >= 8)
@@ -52,6 +57,7 @@ if platform.system() == "Darwin":
 def get_os_name():
     return os.name
 
+IsAppleSiliconMacOs = InMacOS and platform.machine() == "arm64"
 
 string_classes = (str, bytes)
 int_classes = int

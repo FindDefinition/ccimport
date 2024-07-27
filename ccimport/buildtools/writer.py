@@ -885,6 +885,12 @@ def _default_suffix_to_compiler():
             ".cxx": "cl",
             ".cu": "nvcc",
         }
+    elif compat.InMacOS:
+        return {
+            ".cc": "clang++",
+            ".cpp": "clang++",
+            ".cxx": "clang++",
+        }
     else:
         return {
             ".cc": "g++",
@@ -940,6 +946,8 @@ def default_build_meta():
 def _default_linker():
     if compat.InWindows:
         return "cl"
+    elif compat.InMacOS:
+        return "clang++"
     else:
         return "g++"
 
