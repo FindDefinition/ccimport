@@ -141,14 +141,14 @@ def locate_libpython_2(python_version: str):
     interpreter."""
     # https://stackoverflow.com/questions/47423246/get-pythons-lib-path
     import itertools
-    from distutils import sysconfig
+    import sysconfig
 
     # determine direct path to libpython
     python_library = sysconfig.get_config_var('LIBRARY')
 
     # if static (or nonexistent), try to find a suitable dynamic libpython
     if (python_library is None
-            or os.path.splitext(python_library)[1][-2:] == '.a'):
+            or not os.path.exists(python_library)):
 
         candidate_lib_prefixes = ['', 'lib']
 

@@ -890,6 +890,7 @@ def _default_suffix_to_compiler():
             ".cc": "clang++",
             ".cpp": "clang++",
             ".cxx": "clang++",
+            ".mm": "clang++",
         }
     else:
         return {
